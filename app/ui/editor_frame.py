@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from tkinter import Frame
 from PIL import ImageTk
 from app.models import PdfDocument, OverlayItem
 from app.pdf_handler import render_page
@@ -6,7 +7,7 @@ from app.config import DEFAULT_OVERLAY_WIDTH, DEFAULT_OVERLAY_HEIGHT
 
 
 class EditorFrame(ctk.CTkFrame):
-    """Main editor: PDF page viewer + overlay canvas (wired in Sprint 3)."""
+    """Main editor: PDF page viewer + OverlayCanvas stacked on top."""
 
     def __init__(self, parent, pdf_document: PdfDocument, main_window=None, **kwargs):
         super().__init__(parent, corner_radius=0, **kwargs)
@@ -18,6 +19,7 @@ class EditorFrame(ctk.CTkFrame):
         self._overlays: list[OverlayItem] = []
         self._history: list[list[OverlayItem]] = []  # undo stack
         self._redo_stack: list[list[OverlayItem]] = []
+        self._overlay_canvas = None
 
         self._build()
         self._render_current_page()
@@ -30,8 +32,13 @@ class EditorFrame(ctk.CTkFrame):
         self.canvas_frame = ctk.CTkScrollableFrame(self, corner_radius=0)
         self.canvas_frame.pack(fill="both", expand=True)
 
-        self.page_label = ctk.CTkLabel(self.canvas_frame, text="")
-        self.page_label.pack(padx=8, pady=8)
+        # Container to stack page image + overlay canvas
+        self.page_container = Frame(self.canvas_frame, bg="gray20")
+        self.page_container.pack(padx=8, pady=8)
+
+        # PDF page image label (background)
+        self.page_label = ctk.CTkLabel(self.page_container, text="")
+        self.page_label.place(x=0, y=0)
 
         # Navigation bar
         nav = ctk.CTkFrame(self, height=40, corner_radius=0)
@@ -53,7 +60,29 @@ class EditorFrame(ctk.CTkFrame):
     def _render_current_page(self):
         self._page_image = render_page(self.pdf_document.path, self.current_page)
         self._tk_image = ImageTk.PhotoImage(self._page_image)
+        w, h = self._page_image.size
+
+        # Resize container to match page
+        self.page_container.config(width=w, height=h)
         self.page_label.configure(image=self._tk_image, text="")
+        self.page_label.place(x=0, y=0, width=w, height=h)
+
+        # Create or resize overlay canvas
+        from app.ui.overlay_canvas import OverlayCanvas
+        if self._overlay_canvas is None:
+            self._overlay_canvas = OverlayCanvas(
+                self.page_container, width=w, height=h,
+                on_change=self._on_overlay_change
+            )
+            self._overlay_canvas.place(x=0, y=0)
+        else:
+            self._overlay_canvas.resize(w, h)
+            self._overlay_canvas.place(x=0, y=0, width=w, height=h)
+
+        # Show only overlays for current page
+        page_overlays = [o for o in self._overlays if o.page_index == self.current_page]
+        self._overlay_canvas.set_overlays(page_overlays)
+
         self.lbl_page.configure(
             text=f"Halaman {self.current_page + 1} / {self.pdf_document.page_count}"
         )
@@ -61,6 +90,17 @@ class EditorFrame(ctk.CTkFrame):
         self.btn_next.configure(
             state="normal" if self.current_page < self.pdf_document.page_count - 1 else "disabled"
         )
+
+    def _on_overlay_change(self):
+        """Sync overlay canvas state back to master list."""
+        if self._overlay_canvas is None:
+            return
+        # Replace overlays for current page with canvas state
+        other_pages = [o for o in self._overlays if o.page_index != self.current_page]
+        current_page_overlays = self._overlay_canvas.get_overlays()
+        for ov in current_page_overlays:
+            ov.page_index = self.current_page
+        self._overlays = other_pages + current_page_overlays
 
     def _prev_page(self):
         if self.current_page > 0:
@@ -106,8 +146,11 @@ class EditorFrame(ctk.CTkFrame):
             self.main_window.saved_panel.refresh()
 
     def _refresh_overlay_canvas(self):
-        """Placeholder — OverlayCanvas wired in Sprint 3."""
-        pass
+        """Push current overlays to OverlayCanvas and redraw."""
+        if self._overlay_canvas is None:
+            return
+        page_overlays = [o for o in self._overlays if o.page_index == self.current_page]
+        self._overlay_canvas.set_overlays(page_overlays)
 
     # ------------------------------------------------------------------
     # Undo / Redo
