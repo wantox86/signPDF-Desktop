@@ -163,7 +163,6 @@ class OverlayCanvas(ctk.CTkFrame):
         menu = Menu(self.canvas, tearoff=0)
         menu.add_command(label="Hapus", command=lambda: self._delete_selected())
         menu.tk_popup(event.x_root, event.y_root)
-
     def _delete_selected(self):
         if self._selected_id is None:
             return

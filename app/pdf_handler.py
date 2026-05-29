@@ -7,7 +7,13 @@ from app.config import RENDER_DPI
 
 
 def open_pdf(path: str) -> PdfDocument:
-    doc = fitz.open(path)
+    try:
+        doc = fitz.open(path)
+    except Exception as e:
+        raise ValueError(f"Tidak dapat membuka PDF '{path}': {e}") from e
+    if doc.page_count == 0:
+        doc.close()
+        raise ValueError(f"PDF '{path}' tidak memiliki halaman.")
     pdf = PdfDocument(
         path=path,
         page_count=doc.page_count,

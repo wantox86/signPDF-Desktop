@@ -92,6 +92,7 @@ class SavedSignaturesPanel(ctk.CTkFrame):
         # Click to select
         for w in (cell, img_lbl):
             w.bind("<Button-1>", lambda e, r=record: self._on_click(r))
+            w.bind("<Button-3>", lambda e, r=record: self._show_context_menu(e, r))
 
         # Delete button
         del_btn = ctk.CTkButton(cell, text="×", width=18, height=18,
@@ -99,6 +100,23 @@ class SavedSignaturesPanel(ctk.CTkFrame):
                                 font=ctk.CTkFont(size=11),
                                 command=lambda r=record: self._delete(r))
         del_btn.place(relx=1.0, rely=0.0, anchor="ne")
+
+    def _show_context_menu(self, event, record: SignatureRecord):
+        from tkinter import Menu
+        menu = Menu(self, tearoff=0)
+        menu.add_command(label="Gunakan", command=lambda: self._on_click(record))
+        menu.add_command(label="Ubah Nama", command=lambda: self._rename(record))
+        menu.add_separator()
+        menu.add_command(label="Hapus", command=lambda: self._delete(record))
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _rename(self, record: SignatureRecord):
+        import customtkinter as ctk
+        dialog = ctk.CTkInputDialog(text="Nama baru:", title="Ubah Nama")
+        new_label = dialog.get_input()
+        if new_label and new_label.strip():
+            database.update_label(record.id, new_label.strip())
+            self.refresh()
 
     def _on_click(self, record: SignatureRecord):
         if self.on_select:
