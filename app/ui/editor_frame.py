@@ -101,6 +101,9 @@ class EditorFrame(ctk.CTkFrame):
             database.mark_used(sig_record.id)
         self._redo_stack.clear()
         self._refresh_overlay_canvas()
+        # Refresh left panel if available
+        if self.main_window and hasattr(self.main_window, "saved_panel"):
+            self.main_window.saved_panel.refresh()
 
     def _refresh_overlay_canvas(self):
         """Placeholder — OverlayCanvas wired in Sprint 3."""

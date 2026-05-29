@@ -76,15 +76,17 @@ class MainWindow(ctk.CTk):
         self.content = ctk.CTkFrame(self, corner_radius=0)
         self.content.pack(fill="both", expand=True)
 
-        # Left panel placeholder (200px) — wired in Sprint 2
+        # Left panel — Saved Signatures (200px)
         self.left_panel = ctk.CTkFrame(self.content, width=200, corner_radius=0)
         self.left_panel.pack(side="left", fill="y")
         self.left_panel.pack_propagate(False)
 
-        self.left_placeholder = ctk.CTkLabel(self.left_panel,
-                                             text="Tanda Tangan\nTersimpan",
-                                             text_color="gray")
-        self.left_placeholder.pack(expand=True)
+        from app.ui.saved_signatures import SavedSignaturesPanel
+        self.saved_panel = SavedSignaturesPanel(
+            self.left_panel,
+            on_select=self._on_saved_signature_selected
+        )
+        self.saved_panel.pack(fill="both", expand=True)
 
         # Right: editor area
         self.editor_area = ctk.CTkFrame(self.content, corner_radius=0)
@@ -139,6 +141,33 @@ class MainWindow(ctk.CTk):
     def add_paraf(self):
         if self.editor_frame:
             self.editor_frame.add_signature("PARAF")
+
+    def _on_saved_signature_selected(self, record):
+        """User clicked a thumbnail in the left panel — add overlay directly."""
+        if self.editor_frame is None:
+            return
+        try:
+            from PIL import Image
+            img = Image.open(record.image_path).convert("RGBA")
+        except Exception:
+            return
+        from app.models import OverlayItem
+        from app.config import DEFAULT_OVERLAY_WIDTH, DEFAULT_OVERLAY_HEIGHT
+        from app import database as db
+        self.editor_frame._push_history()
+        overlay = OverlayItem(
+            sig_type=record.sig_type,
+            image=img,
+            page_index=self.editor_frame.current_page,
+            x=100.0, y=100.0,
+            width=float(DEFAULT_OVERLAY_WIDTH),
+            height=float(DEFAULT_OVERLAY_HEIGHT),
+            signature_record_id=record.id,
+        )
+        self.editor_frame._overlays.append(overlay)
+        db.mark_used(record.id)
+        self.editor_frame._redo_stack.clear()
+        self.editor_frame._refresh_overlay_canvas()
 
     def undo(self):
         if self.editor_frame:
