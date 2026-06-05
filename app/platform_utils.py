@@ -33,8 +33,19 @@ def get_redo_shortcut() -> str:
     Returns tkinter bind string.
     """
     if sys.platform == "darwin":
-        return "<Command-shift-z>"
+        return "<Command-Shift-z>"
     return "<Control-y>"
+
+
+def get_canvas_transparent_bg() -> str:
+    """Return a tkinter-valid background color that renders as transparent overlay.
+    macOS supports 'systemTransparent'; Windows/Linux use 'white' as closest fallback."""
+    if sys.platform == "darwin":
+        return "systemTransparent"
+    elif sys.platform == "win32":
+        return "white"
+    else:
+        return "white"
 
 
 def get_modifier_key() -> str:
@@ -48,7 +59,7 @@ def bind_shortcuts(widget, open_cb, save_cb, undo_cb, redo_cb):
         widget.bind("<Command-o>", lambda e: open_cb())
         widget.bind("<Command-s>", lambda e: save_cb())
         widget.bind("<Command-z>", lambda e: undo_cb())
-        widget.bind("<Command-shift-z>", lambda e: redo_cb())
+        widget.bind("<Command-Shift-z>", lambda e: redo_cb())
     else:
         widget.bind("<Control-o>", lambda e: open_cb())
         widget.bind("<Control-s>", lambda e: save_cb())

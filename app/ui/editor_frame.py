@@ -1,23 +1,28 @@
 import customtkinter as ctk
-from tkinter import Frame
-from PIL import ImageTk
+from tkinter import Frame, Canvas, ttk
+from PIL import Image, ImageTk
 from app.models import PdfDocument, OverlayItem
 from app.pdf_handler import render_page
 from app.config import DEFAULT_OVERLAY_WIDTH, DEFAULT_OVERLAY_HEIGHT
 
+ZOOM_STEP = 0.25
+ZOOM_MIN  = 0.25
+ZOOM_MAX  = 3.0
+
 
 class EditorFrame(ctk.CTkFrame):
-    """Main editor: PDF page viewer + OverlayCanvas stacked on top."""
+    """Main editor: PDF page viewer + OverlayCanvas with zoom and 2D scroll."""
 
     def __init__(self, parent, pdf_document: PdfDocument, main_window=None, **kwargs):
         super().__init__(parent, corner_radius=0, **kwargs)
-        self.pdf_document = pdf_document
-        self.main_window = main_window
-        self.current_page = 0
-        self._page_image = None   # PIL Image of current page
-        self._tk_image = None     # ImageTk reference (prevent GC)
+        self.pdf_document  = pdf_document
+        self.main_window   = main_window
+        self.current_page  = 0
+        self._base_image   = None   # PIL Image at RENDER_DPI (zoom=1.0)
+        self._tk_image     = None   # ImageTk ref for current display size
+        self._zoom         = 1.0
         self._overlays: list[OverlayItem] = []
-        self._history: list[list[OverlayItem]] = []  # undo stack
+        self._history:    list[list[OverlayItem]] = []
         self._redo_stack: list[list[OverlayItem]] = []
         self._overlay_canvas = None
 
@@ -25,22 +30,39 @@ class EditorFrame(ctk.CTkFrame):
         self._render_current_page()
 
     # ------------------------------------------------------------------
-    # Build layout
+    # Layout
     # ------------------------------------------------------------------
     def _build(self):
-        # Page display area (scrollable)
-        self.canvas_frame = ctk.CTkScrollableFrame(self, corner_radius=0)
-        self.canvas_frame.pack(fill="both", expand=True)
+        # ── 2D scrollable area ────────────────────────────────────────
+        scroll_area = Frame(self, bg="gray15")
+        scroll_area.pack(fill="both", expand=True)
 
-        # Container to stack page image + overlay canvas
-        self.page_container = Frame(self.canvas_frame, bg="gray20")
-        self.page_container.pack(padx=8, pady=8)
+        vbar = ttk.Scrollbar(scroll_area, orient="vertical")
+        hbar = ttk.Scrollbar(scroll_area, orient="horizontal")
+        self._scroll_canvas = Canvas(
+            scroll_area, bg="gray15", highlightthickness=0,
+            yscrollcommand=vbar.set, xscrollcommand=hbar.set,
+        )
+        vbar.config(command=self._scroll_canvas.yview)
+        hbar.config(command=self._scroll_canvas.xview)
 
-        # PDF page image label (background)
-        self.page_label = ctk.CTkLabel(self.page_container, text="")
-        self.page_label.place(x=0, y=0)
+        vbar.pack(side="right",  fill="y")
+        hbar.pack(side="bottom", fill="x")
+        self._scroll_canvas.pack(fill="both", expand=True)
 
-        # Navigation bar
+        # Page container placed inside scroll canvas
+        self.page_container = Frame(self._scroll_canvas, bg="gray20")
+        self._scroll_window = self._scroll_canvas.create_window(
+            8, 8, anchor="nw", window=self.page_container
+        )
+        self.page_container.bind("<Configure>", self._update_scrollregion)
+
+        # Mousewheel bindings (macOS / Windows use <MouseWheel>)
+        for widget in (self._scroll_canvas, self.page_container):
+            widget.bind("<MouseWheel>",       self._on_scroll_v)
+            widget.bind("<Shift-MouseWheel>", self._on_scroll_h)
+
+        # ── Navigation + Zoom bar ─────────────────────────────────────
         nav = ctk.CTkFrame(self, height=40, corner_radius=0)
         nav.pack(side="bottom", fill="x")
         nav.pack_propagate(False)
@@ -51,56 +73,107 @@ class EditorFrame(ctk.CTkFrame):
         self.lbl_page = ctk.CTkLabel(nav, text="")
         self.lbl_page.pack(side="left", expand=True)
 
+        # Zoom controls (right side, right-to-left)
         self.btn_next = ctk.CTkButton(nav, text="Next >", width=80, command=self._next_page)
         self.btn_next.pack(side="right", padx=8, pady=4)
 
+        ctk.CTkButton(nav, text="+", width=32, command=self._zoom_in).pack(
+            side="right", padx=(0, 4), pady=4)
+        self.lbl_zoom = ctk.CTkLabel(nav, text="100%", width=48)
+        self.lbl_zoom.pack(side="right", pady=4)
+        ctk.CTkButton(nav, text="−", width=32, command=self._zoom_out).pack(
+            side="right", padx=(4, 0), pady=4)
+        ctk.CTkLabel(nav, text="Zoom:", text_color="gray").pack(side="right", padx=(8, 2), pady=4)
+
+    def _update_scrollregion(self, event=None):
+        self._scroll_canvas.configure(scrollregion=self._scroll_canvas.bbox("all"))
+
+    def _on_scroll_v(self, event):
+        self._scroll_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+
+    def _on_scroll_h(self, event):
+        self._scroll_canvas.xview_scroll(-1 if event.delta > 0 else 1, "units")
+
     # ------------------------------------------------------------------
-    # Page navigation
+    # Zoom
+    # ------------------------------------------------------------------
+    def _zoom_in(self):
+        if self._zoom < ZOOM_MAX:
+            self._zoom = round(min(ZOOM_MAX, self._zoom + ZOOM_STEP), 2)
+            self._apply_zoom()
+
+    def _zoom_out(self):
+        if self._zoom > ZOOM_MIN:
+            self._zoom = round(max(ZOOM_MIN, self._zoom - ZOOM_STEP), 2)
+            self._apply_zoom()
+
+    def _apply_zoom(self):
+        if self._base_image is None:
+            return
+        bw, bh = self._base_image.size
+        dw = max(1, int(bw * self._zoom))
+        dh = max(1, int(bh * self._zoom))
+        display = self._base_image.resize((dw, dh), Image.LANCZOS)
+        self._tk_image = ImageTk.PhotoImage(display)
+        self.lbl_zoom.configure(text=f"{int(self._zoom * 100)}%")
+
+        self.page_container.config(width=dw, height=dh)
+        if self._overlay_canvas:
+            self._overlay_canvas.set_zoom(self._zoom)
+            self._overlay_canvas.resize(dw, dh)
+            self._overlay_canvas.set_page_image(self._tk_image)
+            page_overlays = [o for o in self._overlays if o.page_index == self.current_page]
+            self._overlay_canvas.set_overlays(page_overlays)
+
+    # ------------------------------------------------------------------
+    # Page render / navigation
     # ------------------------------------------------------------------
     def _render_current_page(self):
-        self._page_image = render_page(self.pdf_document.path, self.current_page)
-        self._tk_image = ImageTk.PhotoImage(self._page_image)
-        w, h = self._page_image.size
+        self._base_image = render_page(self.pdf_document.path, self.current_page)
+        bw, bh = self._base_image.size
+        dw = max(1, int(bw * self._zoom))
+        dh = max(1, int(bh * self._zoom))
+        display = self._base_image if self._zoom == 1.0 else \
+                  self._base_image.resize((dw, dh), Image.LANCZOS)
+        self._tk_image = ImageTk.PhotoImage(display)
 
-        # Resize container to match page
-        self.page_container.config(width=w, height=h)
-        self.page_label.configure(image=self._tk_image, text="")
-        self.page_label.place(x=0, y=0, width=w, height=h)
+        self.page_container.config(width=dw, height=dh)
 
-        # Create or resize overlay canvas
         from app.ui.overlay_canvas import OverlayCanvas
         if self._overlay_canvas is None:
             self._overlay_canvas = OverlayCanvas(
-                self.page_container, width=w, height=h,
+                self.page_container, width=dw, height=dh,
                 on_change=self._on_overlay_change
             )
             self._overlay_canvas.place(x=0, y=0)
+            # Propagate mousewheel from overlay canvas to scroll canvas
+            self._overlay_canvas.canvas.bind("<MouseWheel>",       self._on_scroll_v)
+            self._overlay_canvas.canvas.bind("<Shift-MouseWheel>", self._on_scroll_h)
         else:
-            self._overlay_canvas.resize(w, h)
-            self._overlay_canvas.place(x=0, y=0, width=w, height=h)
+            self._overlay_canvas.set_zoom(self._zoom)
+            self._overlay_canvas.resize(dw, dh)
 
-        # Show only overlays for current page
+        self._overlay_canvas.set_page_image(self._tk_image)
         page_overlays = [o for o in self._overlays if o.page_index == self.current_page]
         self._overlay_canvas.set_overlays(page_overlays)
 
         self.lbl_page.configure(
             text=f"Halaman {self.current_page + 1} / {self.pdf_document.page_count}"
         )
+        self.lbl_zoom.configure(text=f"{int(self._zoom * 100)}%")
         self.btn_prev.configure(state="normal" if self.current_page > 0 else "disabled")
         self.btn_next.configure(
             state="normal" if self.current_page < self.pdf_document.page_count - 1 else "disabled"
         )
 
     def _on_overlay_change(self):
-        """Sync overlay canvas state back to master list."""
         if self._overlay_canvas is None:
             return
-        # Replace overlays for current page with canvas state
-        other_pages = [o for o in self._overlays if o.page_index != self.current_page]
-        current_page_overlays = self._overlay_canvas.get_overlays()
-        for ov in current_page_overlays:
+        other = [o for o in self._overlays if o.page_index != self.current_page]
+        current = self._overlay_canvas.get_overlays()
+        for ov in current:
             ov.page_index = self.current_page
-        self._overlays = other_pages + current_page_overlays
+        self._overlays = other + current
 
     def _prev_page(self):
         if self.current_page > 0:
@@ -113,14 +186,13 @@ class EditorFrame(ctk.CTkFrame):
             self._render_current_page()
 
     # ------------------------------------------------------------------
-    # Overlay management (Sprint 3 will add OverlayCanvas)
+    # Overlay management
     # ------------------------------------------------------------------
     def add_signature(self, sig_type: str):
-        """Open SignaturePickerModal and add resulting overlay. Wired in Sprint 2/3."""
         from app.ui.signature_picker import SignaturePickerModal
         modal = SignaturePickerModal(self, sig_type=sig_type)
         self.wait_window(modal)
-        result = modal.result  # (pil_image, signature_record | None)
+        result = modal.result
         if result is None:
             return
         pil_image, sig_record = result
@@ -129,8 +201,7 @@ class EditorFrame(ctk.CTkFrame):
             sig_type=sig_type,
             image=pil_image,
             page_index=self.current_page,
-            x=100.0,
-            y=100.0,
+            x=100.0, y=100.0,
             width=float(DEFAULT_OVERLAY_WIDTH),
             height=float(DEFAULT_OVERLAY_HEIGHT),
             signature_record_id=sig_record.id if sig_record else None,
@@ -141,14 +212,14 @@ class EditorFrame(ctk.CTkFrame):
             database.mark_used(sig_record.id)
         self._redo_stack.clear()
         self._refresh_overlay_canvas()
-        # Refresh left panel if available
         if self.main_window and hasattr(self.main_window, "saved_panel"):
             self.main_window.saved_panel.refresh()
 
     def _refresh_overlay_canvas(self):
-        """Push current overlays to OverlayCanvas and redraw."""
         if self._overlay_canvas is None:
             return
+        if self._tk_image is not None:
+            self._overlay_canvas.set_page_image(self._tk_image)
         page_overlays = [o for o in self._overlays if o.page_index == self.current_page]
         self._overlay_canvas.set_overlays(page_overlays)
 
@@ -184,28 +255,25 @@ class EditorFrame(ctk.CTkFrame):
     def save(self):
         from pathlib import Path
         source = Path(self.pdf_document.path)
-        output_path = str(source.parent / f"{source.stem}_signed{source.suffix}")
-        self._do_save(output_path)
+        self._do_save(str(source.parent / f"{source.stem}_signed{source.suffix}"))
 
     def save_as(self):
         from tkinter import filedialog
         from pathlib import Path
         source = Path(self.pdf_document.path)
-        output_path = filedialog.asksaveasfilename(
+        path = filedialog.asksaveasfilename(
             title="Simpan PDF sebagai",
             initialfile=f"{source.stem}_signed.pdf",
             defaultextension=".pdf",
-            filetypes=[("PDF files", "*.pdf")]
+            filetypes=[("PDF files", "*.pdf")],
         )
-        if output_path:
-            self._do_save(output_path)
+        if path:
+            self._do_save(path)
 
     def _do_save(self, output_path: str):
         import threading
-        import customtkinter as ctk
         from tkinter import messagebox
         from app.pdf_handler import embed_overlays_and_save
-        from app.platform_utils import open_folder
 
         def worker():
             try:
