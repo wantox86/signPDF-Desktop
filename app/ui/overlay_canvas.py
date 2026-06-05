@@ -34,6 +34,7 @@ class OverlayCanvas(ctk.CTkFrame):
         self.canvas.bind("<B1-Motion>",       self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
         self.canvas.bind("<Button-3>",        self._on_right_click)
+        self.canvas.bind("<Delete>",          self._on_delete_key)
 
     # ------------------------------------------------------------------
     # Public API
@@ -196,3 +197,7 @@ class OverlayCanvas(ctk.CTkFrame):
         self._redraw()
         if self.on_change:
             self.on_change()
+
+    def _on_delete_key(self, event) -> None:
+        """Delete selected overlay when Delete key is pressed."""
+        self._delete_selected()

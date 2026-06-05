@@ -6,17 +6,21 @@ Desktop application for adding digital signatures and initials to PDF documents.
 
 ## Features
 
-- **Open PDF** — display documents page by page with Prev / Next navigation
+- **Open PDF** — display documents page by page with Prev / Next navigation (default zoom: 75%)
 - **Add Signature / Initials** — three ways:
   - Draw directly on the canvas
   - Import from PNG / JPG file (white background removed automatically)
   - Select from saved signature library
 - **Drag & resize** — move and resize signature overlays on the PDF page
+- **Delete overlays** — right-click or press Delete key to remove overlays
 - **Multi-page** — place overlays on different pages in a single session
 - **Signature library** — save signatures/initials for reuse in future sessions (stored locally in SQLite)
 - **Undo / Redo** — undo or redo overlay changes
 - **Save PDF** — embed all overlays and generate `*_signed.pdf` in the same folder
 - **Save As** — choose output name and location
+- **Menu bar** — File, Edit, Help menus with all functions accessible
+- **Mouse wheel scroll** — scroll PDF page with mouse wheel (Shift+Wheel for horizontal)
+- **Perfect thumbnails** — signature thumbnails maintain original aspect ratio, centered in 80×40px cells (no stretching)
 - **Cross-platform** — single codebase for Windows, macOS, and Linux
 
 ---
@@ -25,19 +29,23 @@ Desktop application for adding digital signatures and initials to PDF documents.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  📂 Open PDF  💾 Save  💾 Save As                               │
-│  ✍ Add Signature  ✍ Add Initials  ↩ Undo  ↪ Redo               │
+│  File  Edit  Help                                               │
+├─────────────────────────────────────────────────────────────────┤
+│  📁 Open PDF  💾 Save  💾 Save As                               │
+│  ✎ Add Signature  ✎ Add Initials  ⟲ Undo  ↻ Redo               │
 ├──────────────────┬──────────────────────────────────────────────┤
 │  Left Panel      │  Editor Area                                  │
 │  ──────────────  │                                               │
 │ [Sig][Init]      │   ┌────────────────────────────────────┐    │
-│                  │   │                                      │    │
-│ [thumbnail Sig]  │   │   PDF Page (rendered)              │    │
-│ [thumbnail Sig]  │   │                                      │    │
-│ [thumbnail Init] │   │   [signature overlay — draggable]  │    │
-│ ...              │   │                                      │    │
+│                  │   │      [SignPDF Icon]                │    │
+│ [thumbnail Sig]  │   │   PDF Page (75% zoom)              │    │
+│ [thumbnail Sig]  │   │   (scroll with mouse wheel)         │    │
+│ [thumbnail Init] │   │                                      │    │
+│ ...              │   │   [signature overlay — draggable]  │    │
+│                  │   │   (delete with Del key or menu)    │    │
 │                  │   └────────────────────────────────────┘    │
 │                  │       < Prev    Page 1 / 5    Next >         │
+│                  │       Zoom: −  75%  +                        │
 └──────────────────┴──────────────────────────────────────────────┘
 ```
 
@@ -99,6 +107,27 @@ On first run, the application creates a data folder automatically:
 
 ## Usage
 
+### Menu Bar
+
+The menu bar at the top provides access to all main functions:
+
+**File menu:**
+- **Open PDF** — open a PDF document (Ctrl+O)
+- **Save** — save with auto-generated `_signed` suffix (Ctrl+S)
+- **Save As** — save with custom name and location
+- **Exit** — close the application
+
+**Edit menu:**
+- **Add Signature** — add a full signature overlay
+- **Add Initials** — add initials/abbreviated signature
+- **Undo** — undo last change (Ctrl+Z)
+- **Redo** — redo last undone change (Ctrl+Y)
+
+**Help menu:**
+- **About SignPDF** — view application information
+
+---
+
 ### Opening a PDF
 
 1. Click **📂 Open PDF** in the toolbar, or press `Ctrl+O` (Windows/Linux) / `Cmd+O` (macOS)
@@ -149,7 +178,8 @@ After placing an overlay on a page:
 | Resize | Click and drag the **blue handle** at the bottom-right corner |
 | Select | Click once on the overlay (blue dashed border appears) |
 | Deselect | Click on empty area outside the overlay |
-| Delete | Right-click on overlay → select **Delete** |
+| Delete | Right-click on overlay → select **Delete**, or press **Delete** key |
+| Scroll page | Use mouse wheel to scroll up/down, Shift+Wheel for left/right |
 
 Overlays in the left panel (thumbnails) can be clicked directly to add a new overlay to the current page without opening the modal.
 
@@ -188,11 +218,17 @@ After successful save:
 
 ### Managing the Signature Library
 
-The left panel displays all saved signatures and initials.
+The left panel displays all saved signatures and initials in a 3-column thumbnail grid.
+
+**Thumbnail display:**
+- Each thumbnail is displayed at its original aspect ratio
+- Thumbnails are centered in 80×40px cells (never stretched or distorted)
+- Wide signatures display wider, tall signatures display taller
+- Fits perfectly in the left panel without scrolling up/down for small collections
 
 **Filter tabs:**
 - **All** — show signatures and initials
-- **Signature** — signature only
+- **Signature** — signatures only
 - **Initials** — initials only
 
 **Deleting a signature:**
@@ -241,6 +277,12 @@ Output: `dist/SignPDF` — ELF binary.
 signpdf-desktop/
 ├── main.py                     # Entry point
 ├── requirements.txt
+├── assets/                     # Application icons
+│   ├── icon.png               # Primary icon (1024×1024)
+│   ├── icon.ico               # Windows executable icon
+│   └── icon.icns              # macOS application icon
+├── res/                        # Original resources
+│   └── icon-signPDF.png       # Source icon file
 ├── app/
 │   ├── config.py               # Data dir path per OS, UI constants
 │   ├── database.py             # SQLite CRUD — signature library
@@ -279,6 +321,25 @@ pytest tests/
 ```
 
 120 unit tests, grouped by sprint. Tests don't require a display (no Tk window opened).
+
+### Application Icons
+
+The app uses professional icons in the `assets/` folder:
+- **icon.png** (1024×1024) — primary icon, displayed in home screen and used by window manager
+- **icon.ico** (256×256) — Windows executable icon
+- **icon.icns** — macOS application icon
+
+If you need to change the icon, replace the files in the `assets/` folder. The PNG format is used as the source, while ICO and ICNS are generated automatically during the build process.
+
+### Button Icons
+
+All toolbar and menu buttons use consistent Unicode symbols:
+- 📁 — Open/Browse files
+- 💾 — Save operations
+- ✎ — Add/Edit signatures
+- ⟲ — Undo
+- ↻ — Redo
+- ⌫ — Clear/Delete
 
 ### Dependencies
 

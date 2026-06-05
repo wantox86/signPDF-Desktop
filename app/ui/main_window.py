@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import filedialog
+from tkinter import filedialog, Menu, messagebox
 from app.config import WINDOW_TITLE, WINDOW_SIZE
 from app.platform_utils import get_app_icon_path, bind_shortcuts
 
@@ -20,6 +20,7 @@ class MainWindow(ctk.CTk):
         self.pdf_document = None
         self.editor_frame = None
 
+        self._build_menubar()
         self._build_toolbar()
         self._build_content()
         bind_shortcuts(self,
@@ -27,6 +28,45 @@ class MainWindow(ctk.CTk):
                        save_cb=self.save_pdf,
                        undo_cb=self.undo,
                        redo_cb=self.redo)
+
+    # ------------------------------------------------------------------
+    # Menu Bar
+    # ------------------------------------------------------------------
+    def _build_menubar(self):
+        menubar = Menu(self)
+        self.config(menu=menubar)
+
+        # File menu
+        file_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Open PDF", command=self.open_pdf, accelerator="Ctrl+O")
+        file_menu.add_command(label="Save", command=self.save_pdf, accelerator="Ctrl+S")
+        file_menu.add_command(label="Save As", command=self.save_pdf_as)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.quit)
+
+        # Edit menu
+        edit_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Edit", menu=edit_menu)
+        edit_menu.add_command(label="Add Signature", command=self.add_ttd, accelerator="—")
+        edit_menu.add_command(label="Add Initials", command=self.add_paraf, accelerator="—")
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Undo", command=self.undo, accelerator="Ctrl+Z")
+        edit_menu.add_command(label="Redo", command=self.redo, accelerator="Ctrl+Y")
+
+        # Help menu
+        help_menu = Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About SignPDF", command=self._show_about)
+
+    def _show_about(self):
+        messagebox.showinfo(
+            "About SignPDF",
+            "SignPDF Desktop v1.0\n\n"
+            "Add digital signatures and initials to PDF documents.\n"
+            "All processing done locally, no internet required.\n\n"
+            "Built with Python, tkinter, and PyMuPDF."
+        )
 
     # ------------------------------------------------------------------
     # Toolbar
@@ -38,7 +78,7 @@ class MainWindow(ctk.CTk):
 
         btn_cfg = {"width": 110, "height": 32}
 
-        self.btn_open = ctk.CTkButton(self.toolbar, text="📂 Open PDF",
+        self.btn_open = ctk.CTkButton(self.toolbar, text="📁 Open PDF",
                                       command=self.open_pdf, **btn_cfg)
         self.btn_open.pack(side="left", padx=(8, 4), pady=8)
 
@@ -51,20 +91,20 @@ class MainWindow(ctk.CTk):
                                          width=140, height=32)
         self.btn_save_as.pack(side="left", padx=4, pady=8)
 
-        self.btn_add_ttd = ctk.CTkButton(self.toolbar, text="✍ Add Signature",
+        self.btn_add_ttd = ctk.CTkButton(self.toolbar, text="✎ Add Signature",
                                          command=self.add_ttd, state="disabled", **btn_cfg)
         self.btn_add_ttd.pack(side="left", padx=4, pady=8)
 
-        self.btn_add_paraf = ctk.CTkButton(self.toolbar, text="✍ Add Initials",
+        self.btn_add_paraf = ctk.CTkButton(self.toolbar, text="✎ Add Initials",
                                            command=self.add_paraf, state="disabled", **btn_cfg)
         self.btn_add_paraf.pack(side="left", padx=4, pady=8)
 
-        self.btn_undo = ctk.CTkButton(self.toolbar, text="↩ Undo",
+        self.btn_undo = ctk.CTkButton(self.toolbar, text="⟲ Undo",
                                       command=self.undo, state="disabled",
                                       width=80, height=32)
         self.btn_undo.pack(side="left", padx=4, pady=8)
 
-        self.btn_redo = ctk.CTkButton(self.toolbar, text="↪ Redo",
+        self.btn_redo = ctk.CTkButton(self.toolbar, text="↻ Redo",
                                       command=self.redo, state="disabled",
                                       width=80, height=32)
         self.btn_redo.pack(side="left", padx=4, pady=8)

@@ -78,17 +78,33 @@ class SavedSignaturesPanel(ctk.CTkFrame):
         cell.grid(row=row, column=col, padx=3, pady=3)
         cell.grid_propagate(False)
 
-        # Thumbnail image
+        # Thumbnail image - maintain aspect ratio
         try:
             img = Image.open(record.image_path).convert("RGBA")
-            img.thumbnail((THUMB_W, THUMB_H))
+            # Calculate dimensions maintaining aspect ratio
+            img_w, img_h = img.size
+            aspect_ratio = img_w / img_h if img_h > 0 else 1.0
+            thumb_h = THUMB_H
+            thumb_w = int(thumb_h * aspect_ratio)
+            # Ensure width doesn't exceed THUMB_W
+            if thumb_w > THUMB_W:
+                thumb_w = THUMB_W
+                thumb_h = int(thumb_w / aspect_ratio)
+            img = img.resize((thumb_w, thumb_h), Image.LANCZOS)
             tk_img = ImageTk.PhotoImage(img)
         except Exception:
             tk_img = None
+            thumb_w = THUMB_W
+            thumb_h = THUMB_H
 
-        img_lbl = ctk.CTkLabel(cell, text="" if tk_img else "?", image=tk_img)
+        # Image container - fixed size, centered
+        img_container = ctk.CTkFrame(cell, width=THUMB_W, height=THUMB_H, fg_color="transparent")
+        img_container.pack(padx=2, pady=(2, 0))
+        img_container.pack_propagate(False)
+
+        img_lbl = ctk.CTkLabel(img_container, text="" if tk_img else "?", image=tk_img)
         img_lbl.image = tk_img  # prevent GC
-        img_lbl.pack(padx=2, pady=(2, 0))
+        img_lbl.place(relx=0.5, rely=0.5, anchor="center")  # Center the image
 
         # Label text
         ctk.CTkLabel(cell, text=record.label[:12], font=ctk.CTkFont(size=9),

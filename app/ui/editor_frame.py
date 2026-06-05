@@ -20,7 +20,7 @@ class EditorFrame(ctk.CTkFrame):
         self.current_page  = 0
         self._base_image   = None   # PIL Image at RENDER_DPI (zoom=1.0)
         self._tk_image     = None   # ImageTk ref for current display size
-        self._zoom         = 1.0
+        self._zoom         = 0.75   # Default zoom 75%
         self._overlays: list[OverlayItem] = []
         self._history:    list[list[OverlayItem]] = []
         self._redo_stack: list[list[OverlayItem]] = []

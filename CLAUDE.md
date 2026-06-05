@@ -1,6 +1,6 @@
 # CLAUDE.md — SignPDF Desktop
 
-Desktop app: draw/import/place digital signatures and initials onto PDFs. Python 3.11+, tkinter + customtkinter, pymupdf, Pillow. All 5 sprints complete, 120 unit tests. UI language: English.
+Desktop app: draw/import/place digital signatures and initials onto PDFs. Python 3.11+, tkinter + customtkinter, pymupdf, Pillow. All 5 sprints complete, 120 unit tests. UI language: English. Features: menu bar, 75% default zoom, aspect-ratio maintained thumbnails, Delete key overlay removal.
 
 ---
 
@@ -32,8 +32,21 @@ Desktop app: draw/import/place digital signatures and initials onto PDFs. Python
 | `ui/overlay_canvas.py` | Drag, resize (bottom-right handle), right-click delete |
 | `ui/signature_picker.py` | 3-tab modal: Saved / Draw New / Import File |
 | `ui/canvas_draw.py` | 600×250px draw canvas, strokes → PIL |
-| `ui/saved_signatures.py` | 3-col thumbnail grid (80×40px), filter tabs, rename/delete |
+| `ui/saved_signatures.py` | 3-col thumbnail grid (80×40px aspect-ratio centered), filter tabs, rename/delete |
 | `ui/home_frame.py` | Landing screen before PDF is opened |
+
+---
+
+## UI Features
+
+- **Menu Bar** — File (Open, Save, Save As, Exit), Edit (Add Signature, Add Initials, Undo, Redo), Help (About)
+- **Default Zoom** — 75% (user can zoom in/out with +/− buttons)
+- **Thumbnail Aspect Ratio** — Maintains original image ratio in left panel grid
+- **Delete Key** — Press Delete to remove selected overlay from PDF
+- **Mouse Wheel Scroll** — Scroll PDF page using mouse wheel (Shift+Wheel for horizontal)
+- **App Icon** — SignPDF icon displayed on home screen, used as window icon across platforms
+- **Button Icons** — Professional Unicode symbols: 📁 Open, 💾 Save, ✎ Add, ⟲ Undo, ↻ Redo, ⌫ Clear, ✓ Done
+- **Thumbnail Display** — Maintains aspect ratio in 80×40px grid, centered within each cell, no stretching
 
 ---
 
@@ -88,6 +101,11 @@ Build on target OS only — no cross-compilation.
 
 ---
 
-## Known Gap
+## Assets
 
-`assets/` (icon files `icon.ico`, `icon.icns`, `icon.png`) does not exist yet. `get_app_icon_path()` returns `None` gracefully — no crash.
+`assets/` folder contains:
+- `icon.png` — 1024×1024 PNG icon (primary format, displayed in home screen)
+- `icon.ico` — 256×256 Windows executable icon
+- `icon.icns` — macOS application icon
+
+All icons are automatically loaded and used by the application. If icon files are missing, the app gracefully continues without them.

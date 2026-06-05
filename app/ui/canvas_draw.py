@@ -32,8 +32,8 @@ class CanvasDrawWidget(ctk.CTkFrame):
         btn_row = ctk.CTkFrame(self, fg_color="transparent")
         btn_row.pack(fill="x", padx=8, pady=(0, 8))
 
-        ctk.CTkButton(btn_row, text="🗑 Clear", width=100, command=self.clear).pack(side="left")
-        ctk.CTkButton(btn_row, text="✔ Done", width=100, command=self._finish).pack(side="right")
+        ctk.CTkButton(btn_row, text="⌫ Clear", width=100, command=self.clear).pack(side="left")
+        ctk.CTkButton(btn_row, text="✓ Done", width=100, command=self._finish).pack(side="right")
 
     # ------------------------------------------------------------------
     # Mouse events
