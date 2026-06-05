@@ -11,8 +11,8 @@ COLS    = 3
 
 class SavedSignaturesPanel(ctk.CTkFrame):
     """
-    Left-panel: scrollable thumbnail grid of saved TTD/Paraf signatures.
-    Tabs: Semua | TTD | PARAF
+    Left-panel: scrollable thumbnail grid of saved Signature/Initials items.
+    Tabs: All | Signature | Initials
     on_select(record: SignatureRecord) called when user clicks a thumbnail.
     """
 
@@ -29,7 +29,7 @@ class SavedSignaturesPanel(ctk.CTkFrame):
         tab_row.pack(fill="x", padx=4, pady=(4, 0))
 
         self._tab_btns: dict[str, ctk.CTkButton] = {}
-        for label, key in [("Semua", None), ("TTD", "TTD"), ("Paraf", "PARAF")]:
+        for label, key in [("All", None), ("Signature", "TTD"), ("Initials", "PARAF")]:
             btn = ctk.CTkButton(tab_row, text=label, width=56, height=26,
                                 command=lambda k=key: self._set_filter(k))
             btn.pack(side="left", padx=2)
@@ -60,7 +60,12 @@ class SavedSignaturesPanel(ctk.CTkFrame):
 
         records = database.get_all_signatures(self._filter)
         if not records:
-            ctk.CTkLabel(self.scroll, text="Belum ada\ntanda tangan",
+            msg = "No signatures"
+            if self._filter == "TTD":
+                msg = "No signatures"
+            elif self._filter == "PARAF":
+                msg = "No initials"
+            ctk.CTkLabel(self.scroll, text=msg,
                          text_color="gray").grid(row=0, column=0, columnspan=COLS, pady=20)
             return
 
@@ -104,15 +109,15 @@ class SavedSignaturesPanel(ctk.CTkFrame):
     def _show_context_menu(self, event, record: SignatureRecord):
         from tkinter import Menu
         menu = Menu(self, tearoff=0)
-        menu.add_command(label="Gunakan", command=lambda: self._on_click(record))
-        menu.add_command(label="Ubah Nama", command=lambda: self._rename(record))
+        menu.add_command(label="Use", command=lambda: self._on_click(record))
+        menu.add_command(label="Rename", command=lambda: self._rename(record))
         menu.add_separator()
-        menu.add_command(label="Hapus", command=lambda: self._delete(record))
+        menu.add_command(label="Delete", command=lambda: self._delete(record))
         menu.tk_popup(event.x_root, event.y_root)
 
     def _rename(self, record: SignatureRecord):
         import customtkinter as ctk
-        dialog = ctk.CTkInputDialog(text="Nama baru:", title="Ubah Nama")
+        dialog = ctk.CTkInputDialog(text="New name:", title="Rename")
         new_label = dialog.get_input()
         if new_label and new_label.strip():
             database.update_label(record.id, new_label.strip())

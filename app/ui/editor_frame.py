@@ -68,14 +68,14 @@ class EditorFrame(ctk.CTkFrame):
         nav.pack_propagate(False)
 
         self.btn_prev = ctk.CTkButton(nav, text="< Prev", width=80, command=self._prev_page)
-        self.btn_prev.pack(side="left", padx=8, pady=4)
+        self.btn_prev.pack(side="left", padx=4, pady=4)
 
         self.lbl_page = ctk.CTkLabel(nav, text="")
-        self.lbl_page.pack(side="left", expand=True)
+        self.lbl_page.pack(side="left", padx=8)
 
         # Zoom controls (right side, right-to-left)
         self.btn_next = ctk.CTkButton(nav, text="Next >", width=80, command=self._next_page)
-        self.btn_next.pack(side="right", padx=8, pady=4)
+        self.btn_next.pack(side="right", padx=4, pady=4)
 
         ctk.CTkButton(nav, text="+", width=32, command=self._zoom_in).pack(
             side="right", padx=(0, 4), pady=4)
@@ -158,7 +158,7 @@ class EditorFrame(ctk.CTkFrame):
         self._overlay_canvas.set_overlays(page_overlays)
 
         self.lbl_page.configure(
-            text=f"Halaman {self.current_page + 1} / {self.pdf_document.page_count}"
+            text=f"Page {self.current_page + 1} / {self.pdf_document.page_count}"
         )
         self.lbl_zoom.configure(text=f"{int(self._zoom * 100)}%")
         self.btn_prev.configure(state="normal" if self.current_page > 0 else "disabled")
@@ -197,13 +197,20 @@ class EditorFrame(ctk.CTkFrame):
             return
         pil_image, sig_record = result
         self._push_history()
+
+        # Calculate dimensions maintaining aspect ratio
+        img_w, img_h = pil_image.size
+        aspect_ratio = img_w / img_h if img_h > 0 else 1.0
+        overlay_h = float(DEFAULT_OVERLAY_HEIGHT)
+        overlay_w = overlay_h * aspect_ratio
+
         overlay = OverlayItem(
             sig_type=sig_type,
             image=pil_image,
             page_index=self.current_page,
             x=100.0, y=100.0,
-            width=float(DEFAULT_OVERLAY_WIDTH),
-            height=float(DEFAULT_OVERLAY_HEIGHT),
+            width=overlay_w,
+            height=overlay_h,
             signature_record_id=sig_record.id if sig_record else None,
         )
         self._overlays.append(overlay)
@@ -262,7 +269,7 @@ class EditorFrame(ctk.CTkFrame):
         from pathlib import Path
         source = Path(self.pdf_document.path)
         path = filedialog.asksaveasfilename(
-            title="Simpan PDF sebagai",
+            title="Save PDF As",
             initialfile=f"{source.stem}_signed.pdf",
             defaultextension=".pdf",
             filetypes=[("PDF files", "*.pdf")],
@@ -280,13 +287,13 @@ class EditorFrame(ctk.CTkFrame):
                 embed_overlays_and_save(self.pdf_document.path, output_path, self._overlays)
                 self.after(0, lambda: self._on_save_success(output_path))
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Gagal Menyimpan", str(e)))
+                self.after(0, lambda: messagebox.showerror("Failed to Save", str(e)))
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_save_success(self, output_path: str):
         from tkinter import messagebox
         from app.platform_utils import open_folder
-        if messagebox.askyesno("Berhasil Disimpan",
-                               f"PDF berhasil disimpan:\n{output_path}\n\nBuka folder?"):
+        if messagebox.askyesno("Saved Successfully",
+                               f"PDF saved successfully:\n{output_path}\n\nOpen folder?"):
             open_folder(output_path)

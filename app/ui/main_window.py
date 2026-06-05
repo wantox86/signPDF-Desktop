@@ -38,24 +38,24 @@ class MainWindow(ctk.CTk):
 
         btn_cfg = {"width": 110, "height": 32}
 
-        self.btn_open = ctk.CTkButton(self.toolbar, text="📂 Buka PDF",
+        self.btn_open = ctk.CTkButton(self.toolbar, text="📂 Open PDF",
                                       command=self.open_pdf, **btn_cfg)
         self.btn_open.pack(side="left", padx=(8, 4), pady=8)
 
-        self.btn_save = ctk.CTkButton(self.toolbar, text="💾 Simpan",
+        self.btn_save = ctk.CTkButton(self.toolbar, text="💾 Save",
                                       command=self.save_pdf, state="disabled", **btn_cfg)
         self.btn_save.pack(side="left", padx=4, pady=8)
 
-        self.btn_save_as = ctk.CTkButton(self.toolbar, text="💾 Simpan Sebagai",
+        self.btn_save_as = ctk.CTkButton(self.toolbar, text="💾 Save As",
                                          command=self.save_pdf_as, state="disabled",
                                          width=140, height=32)
         self.btn_save_as.pack(side="left", padx=4, pady=8)
 
-        self.btn_add_ttd = ctk.CTkButton(self.toolbar, text="✍ Tambah TTD",
+        self.btn_add_ttd = ctk.CTkButton(self.toolbar, text="✍ Add Signature",
                                          command=self.add_ttd, state="disabled", **btn_cfg)
         self.btn_add_ttd.pack(side="left", padx=4, pady=8)
 
-        self.btn_add_paraf = ctk.CTkButton(self.toolbar, text="✍ Tambah Paraf",
+        self.btn_add_paraf = ctk.CTkButton(self.toolbar, text="✍ Add Initials",
                                            command=self.add_paraf, state="disabled", **btn_cfg)
         self.btn_add_paraf.pack(side="left", padx=4, pady=8)
 
@@ -105,7 +105,7 @@ class MainWindow(ctk.CTk):
     # ------------------------------------------------------------------
     def open_pdf(self):
         path = filedialog.askopenfilename(
-            title="Pilih file PDF",
+            title="Open PDF",
             filetypes=[("PDF files", "*.pdf")]
         )
         if not path:
@@ -137,10 +137,12 @@ class MainWindow(ctk.CTk):
     def add_ttd(self):
         if self.editor_frame:
             self.editor_frame.add_signature("TTD")
+            self._update_undo_redo_buttons()
 
     def add_paraf(self):
         if self.editor_frame:
             self.editor_frame.add_signature("PARAF")
+            self._update_undo_redo_buttons()
 
     def _on_saved_signature_selected(self, record):
         """User clicked a thumbnail in the left panel — add overlay directly."""
@@ -155,24 +157,47 @@ class MainWindow(ctk.CTk):
         from app.config import DEFAULT_OVERLAY_WIDTH, DEFAULT_OVERLAY_HEIGHT
         from app import database as db
         self.editor_frame._push_history()
+
+        # Calculate dimensions maintaining aspect ratio
+        img_w, img_h = img.size
+        aspect_ratio = img_w / img_h if img_h > 0 else 1.0
+        overlay_h = float(DEFAULT_OVERLAY_HEIGHT)
+        overlay_w = overlay_h * aspect_ratio
+
         overlay = OverlayItem(
             sig_type=record.sig_type,
             image=img,
             page_index=self.editor_frame.current_page,
             x=100.0, y=100.0,
-            width=float(DEFAULT_OVERLAY_WIDTH),
-            height=float(DEFAULT_OVERLAY_HEIGHT),
+            width=overlay_w,
+            height=overlay_h,
             signature_record_id=record.id,
         )
         self.editor_frame._overlays.append(overlay)
         db.mark_used(record.id)
         self.editor_frame._redo_stack.clear()
         self.editor_frame._refresh_overlay_canvas()
+        self._update_undo_redo_buttons()
 
     def undo(self):
         if self.editor_frame:
             self.editor_frame.undo()
+            self._update_undo_redo_buttons()
 
     def redo(self):
         if self.editor_frame:
             self.editor_frame.redo()
+            self._update_undo_redo_buttons()
+
+    def _update_undo_redo_buttons(self):
+        """Update undo/redo button state based on history availability."""
+        if self.editor_frame is None:
+            self.btn_undo.configure(state="disabled")
+            self.btn_redo.configure(state="disabled")
+        else:
+            self.btn_undo.configure(
+                state="normal" if self.editor_frame._history else "disabled"
+            )
+            self.btn_redo.configure(
+                state="normal" if self.editor_frame._redo_stack else "disabled"
+            )

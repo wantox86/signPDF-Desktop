@@ -1,6 +1,6 @@
 # CLAUDE.md — SignPDF Desktop
 
-Desktop app: draw/import/place TTD & Paraf overlays onto PDFs. Python 3.11+, tkinter + customtkinter, pymupdf, Pillow. All 5 sprints complete, 120 unit tests. UI language: Bahasa Indonesia.
+Desktop app: draw/import/place digital signatures and initials onto PDFs. Python 3.11+, tkinter + customtkinter, pymupdf, Pillow. All 5 sprints complete, 120 unit tests. UI language: English.
 
 ---
 
@@ -30,7 +30,7 @@ Desktop app: draw/import/place TTD & Paraf overlays onto PDFs. Python 3.11+, tki
 | `ui/main_window.py` | Root CTk window, toolbar, layout orchestration |
 | `ui/editor_frame.py` | Page render, overlay lifecycle, undo/redo stack |
 | `ui/overlay_canvas.py` | Drag, resize (bottom-right handle), right-click delete |
-| `ui/signature_picker.py` | 3-tab modal: Tersimpan / Gambar Baru / Import File |
+| `ui/signature_picker.py` | 3-tab modal: Saved / Draw New / Import File |
 | `ui/canvas_draw.py` | 600×250px draw canvas, strokes → PIL |
 | `ui/saved_signatures.py` | 3-col thumbnail grid (80×40px), filter tabs, rename/delete |
 | `ui/home_frame.py` | Landing screen before PDF is opened |

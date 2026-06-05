@@ -8,7 +8,7 @@ from app.signature_handler import load_image_transparent, crop_to_content
 
 class SignaturePickerModal(ctk.CTkToplevel):
     """
-    3-tab modal: Tersimpan | Gambar Baru | Import File
+    3-tab modal: Saved | Draw New | Import File
     result = (pil_image, signature_record | None)  or  None if cancelled.
     """
 
@@ -16,7 +16,7 @@ class SignaturePickerModal(ctk.CTkToplevel):
         super().__init__(parent, **kwargs)
         self.sig_type = sig_type
         self.result = None
-        self.title(f"Pilih Tanda Tangan — {sig_type}")
+        self.title(f"Select Signature — {sig_type}")
         self.geometry("680x460")
         self.resizable(False, False)
         self.grab_set()   # modal
@@ -26,8 +26,8 @@ class SignaturePickerModal(ctk.CTkToplevel):
         self.tabs = ctk.CTkTabview(self, width=660, height=420)
         self.tabs.pack(padx=10, pady=10, fill="both", expand=True)
 
-        self.tabs.add("Tersimpan")
-        self.tabs.add("Gambar Baru")
+        self.tabs.add("Saved")
+        self.tabs.add("Draw New")
         self.tabs.add("Import File")
 
         self._build_tab_saved()
@@ -35,12 +35,12 @@ class SignaturePickerModal(ctk.CTkToplevel):
         self._build_tab_import()
 
     # ------------------------------------------------------------------
-    # Tab: Tersimpan
+    # Tab: Saved
     # ------------------------------------------------------------------
     def _build_tab_saved(self):
         from app.ui.saved_signatures import SavedSignaturesPanel
         panel = SavedSignaturesPanel(
-            self.tabs.tab("Tersimpan"),
+            self.tabs.tab("Saved"),
             on_select=self._use_saved
         )
         panel.pack(fill="both", expand=True)
@@ -49,18 +49,18 @@ class SignaturePickerModal(ctk.CTkToplevel):
         try:
             img = Image.open(record.image_path).convert("RGBA")
         except Exception as e:
-            messagebox.showerror("Error", f"Gagal memuat gambar:\n{e}", parent=self)
+            messagebox.showerror("Error", f"Failed to load image:\n{e}", parent=self)
             return
         self.result = (img, record)
         self.destroy()
 
     # ------------------------------------------------------------------
-    # Tab: Gambar Baru
+    # Tab: Draw New
     # ------------------------------------------------------------------
     def _build_tab_draw(self):
         from app.ui.canvas_draw import CanvasDrawWidget
         self._draw_widget = CanvasDrawWidget(
-            self.tabs.tab("Gambar Baru"),
+            self.tabs.tab("Draw New"),
             on_done=self._on_draw_done
         )
         self._draw_widget.pack(fill="both", expand=True)
@@ -73,18 +73,18 @@ class SignaturePickerModal(ctk.CTkToplevel):
     # ------------------------------------------------------------------
     def _build_tab_import(self):
         tab = self.tabs.tab("Import File")
-        ctk.CTkLabel(tab, text="Pilih file PNG atau JPG (background putih akan dihapus otomatis)",
+        ctk.CTkLabel(tab, text="Select PNG or JPG file (white background will be removed automatically)",
                      text_color="gray").pack(pady=(20, 8))
-        ctk.CTkButton(tab, text="📁 Pilih File...", width=180, command=self._browse_file).pack()
+        ctk.CTkButton(tab, text="📁 Choose File...", width=180, command=self._browse_file).pack()
         self._import_preview_label = ctk.CTkLabel(tab, text="")
         self._import_preview_label.pack(pady=8)
         self._import_image: Image.Image | None = None
-        ctk.CTkButton(tab, text="Gunakan Gambar Ini", width=180,
+        ctk.CTkButton(tab, text="Use This Image", width=180,
                       command=self._use_imported).pack(pady=4)
 
     def _browse_file(self):
         path = filedialog.askopenfilename(
-            title="Pilih gambar tanda tangan",
+            title="Select signature image",
             filetypes=[("Image files", "*.png *.jpg *.jpeg")],
             parent=self
         )
@@ -94,7 +94,7 @@ class SignaturePickerModal(ctk.CTkToplevel):
             img = load_image_transparent(path)
             img = crop_to_content(img)
         except Exception as e:
-            messagebox.showerror("Error", f"Gagal memuat file:\n{e}", parent=self)
+            messagebox.showerror("Error", f"Failed to load file:\n{e}", parent=self)
             return
         self._import_image = img
         # Show preview
@@ -107,7 +107,7 @@ class SignaturePickerModal(ctk.CTkToplevel):
 
     def _use_imported(self):
         if self._import_image is None:
-            messagebox.showwarning("Belum Ada Gambar", "Pilih file gambar terlebih dahulu.", parent=self)
+            messagebox.showwarning("No Image Selected", "Please select an image file first.", parent=self)
             return
         self._ask_save_and_return(self._import_image, source="file")
 
@@ -116,8 +116,8 @@ class SignaturePickerModal(ctk.CTkToplevel):
     # ------------------------------------------------------------------
     def _ask_save_and_return(self, pil_image: Image.Image, source: str):
         save = messagebox.askyesno(
-            "Simpan Tanda Tangan?",
-            "Simpan tanda tangan ini untuk digunakan lagi?",
+            "Save Signature?",
+            "Save this signature for future use?",
             parent=self
         )
         record = None
@@ -137,8 +137,8 @@ class SignaturePickerModal(ctk.CTkToplevel):
     def _ask_label(self) -> str | None:
         default = f"{self.sig_type} 1"
         dialog = ctk.CTkInputDialog(
-            text=f"Nama tanda tangan (contoh: {default}):",
-            title="Beri Nama"
+            text=f"Signature name (example: {default}):",
+            title="Name Signature"
         )
         label = dialog.get_input()
         if label is None or label.strip() == "":

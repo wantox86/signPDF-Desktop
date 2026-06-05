@@ -116,9 +116,9 @@ signpdf-desktop/
 │       ├── home_frame.py            # Open PDF button
 │       ├── editor_frame.py          # PDF viewer + overlay canvas
 │       ├── signature_picker.py      # Modal: pick saved / draw new / import file
-│       ├── canvas_draw.py           # Draw TTD/Paraf on canvas widget
+│       ├── canvas_draw.py           # Draw Signature/Initials on canvas widget
 │       ├── overlay_canvas.py        # Tkinter Canvas overlay: drag, resize overlays
-│       └── saved_signatures.py      # Panel: grid of saved TTD/Paraf thumbnails
+│       └── saved_signatures.py      # Panel: grid of saved Signature/Initials thumbnails
 └── build/
     ├── build_windows.spec           # PyInstaller spec for Windows
     ├── build_macos.spec             # PyInstaller spec for macOS
@@ -204,10 +204,10 @@ import time
 
 @dataclass
 class SignatureRecord:
-    """Persisted signature/paraf saved in SQLite."""
+    """Persisted signature/initials saved in SQLite."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    label: str = ""                    # e.g. "TTD Wawan" or "Paraf WA"
-    sig_type: str = "TTD"              # "TTD" or "PARAF"
+    label: str = ""                    # e.g. "Signature John" or "Initials JD"
+    sig_type: str = "TTD"              # "TTD" (Signature) or "PARAF" (Initials)
     source: str = "canvas"             # "canvas" | "file"
     image_path: str = ""               # Absolute path to PNG in APP_DATA_DIR/sigs/
     created_at: float = field(default_factory=time.time)
@@ -217,9 +217,9 @@ class SignatureRecord:
 
 @dataclass
 class OverlayItem:
-    """A signature/paraf overlay placed on a PDF page."""
+    """A signature/initials overlay placed on a PDF page."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    sig_type: str = "TTD"              # "TTD" or "PARAF"
+    sig_type: str = "TTD"              # "TTD" (Signature) or "PARAF" (Initials)
     image: Optional[Image.Image] = None
     page_index: int = 0
     x: float = 100.0                   # Position on rendered page (pixels)
@@ -468,9 +468,9 @@ def crop_to_content(img: Image.Image, padding: int = 10) -> Image.Image:
 
 ### 1. Saved Signatures Library Flow
 ```
-User draws or imports TTD/Paraf
-    → App shows dialog: "Simpan untuk digunakan lagi?"
-        → YES → ask label (default: "TTD 1" / "Paraf 1")
+User draws or imports Signature/Initials
+    → App shows dialog: "Save this signature for future use?"
+        → YES → ask label (default: "Signature 1" / "Initials 1")
                → database.save_signature(record, pil_image)
                → PNG saved to APP_DATA_DIR/sigs/{uuid}.png
         → NO  → use once, do not persist
@@ -485,7 +485,7 @@ Next session:
 ### 2. Saved Signatures Panel — `ui/saved_signatures.py`
 - `CTkScrollableFrame`, thumbnail grid 3 columns
 - Each item: 80×40px preview + label + small "×" delete button
-- Filter tabs: "Semua" | "TTD" | "Paraf"
+- Filter tabs: "All" | "Signature" | "Initials"
 - Sorted by `last_used_at DESC`
 - On select: return `SignatureRecord` to caller via callback
 
@@ -497,42 +497,42 @@ Next session:
   - `<ButtonPress-1>`: select overlay under cursor
   - `<B1-Motion>`: drag selected overlay
   - Corner handle drag: resize selected overlay
-- Right-click on overlay: context menu → "Hapus" / "Ubah Nama"
+- Right-click on overlay: context menu → "Delete"
 - Exposes: `get_overlays() -> list[OverlayItem]`
 
 ### 4. Canvas Draw Widget — `ui/canvas_draw.py`
 - Tkinter `Canvas`, white background, 600×250px
 - `<B1-Motion>`: record stroke points, draw line segments
-- "Hapus" button: clear strokes
-- "Selesai" button: `canvas_strokes_to_image()` → `crop_to_content()` → return PIL Image
+- "Clear" button: clear strokes
+- "Done" button: `canvas_strokes_to_image()` → `crop_to_content()` → return PIL Image
 
 ### 5. Signature Picker Modal — `ui/signature_picker.py`
 Three tabs in `CTkTabview`:
-- **"Tersimpan"**: `SavedSignaturesPanel` → on select, use immediately
-- **"Gambar Baru"**: `CanvasDrawWidget` → on Selesai, show ask-save dialog
+- **"Saved"**: `SavedSignaturesPanel` → on select, use immediately
+- **"Draw New"**: `CanvasDrawWidget` → on Done, show ask-save dialog
 - **"Import File"**: file dialog `*.png *.jpg *.jpeg` → `load_image_transparent()` → ask-save dialog
 
 Ask-save dialog:
 ```
-"Simpan tanda tangan ini untuk digunakan lagi?"
-[ Simpan ]  [ Gunakan Sekali ]
-If Simpan: CTkInputDialog → label → database.save_signature()
+"Save this signature for future use?"
+[ Save ]  [ Don't Save ]
+If Save: CTkInputDialog → label → database.save_signature()
 ```
 
 ### 6. Main Window Layout — `ui/main_window.py`
 ```
 ┌─────────────────────────────────────────────────┐
-│  Toolbar: [Buka PDF] [Simpan] [Simpan Sebagai]  │
-│           [Tambah TTD] [Tambah Paraf]            │
-│           [Undo] [Redo]                          │
+│  Toolbar: [Open PDF] [Save] [Save As]           │
+│           [Add Signature] [Add Initials]        │
+│           [Undo] [Redo]                         │
 ├──────────────┬──────────────────────────────────┤
-│  Left Panel  │  Editor (PDF page + overlay)     │
-│  Saved Sigs  │                                  │
-│  (200px)     │  ┌──────────────────────────┐   │
+│ Left Panel   │  Editor (PDF page + overlay)     │
+│ Saved Sigs   │                                  │
+│ (200px)      │  ┌──────────────────────────┐   │
 │              │  │  PDF page as image        │   │
-│  [TTD][PARAF]│  │  + OverlayCanvas on top   │   │
-│  thumbnail   │  └──────────────────────────┘   │
-│  grid        │  [< Prev]  Page 1 / 5  [Next >] │
+│ [Sig][Init]  │  │  + OverlayCanvas on top   │   │
+│ thumbnail    │  └──────────────────────────┘   │
+│ grid         │  [< Prev]  Page 1 / 5  [Next >] │
 └──────────────┴──────────────────────────────────┘
 ```
 
@@ -583,8 +583,8 @@ Tasks — create in order:
 6. `app/pdf_handler.py` — `open_pdf()` and `render_page()` only
 7. `app/signature_handler.py` — full implementation
 8. `app/ui/__init__.py` — empty
-9. `app/ui/main_window.py` — CTk window, toolbar (Buka PDF only), content placeholder
-10. `app/ui/home_frame.py` — "Buka PDF" button, `filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])`
+9. `app/ui/main_window.py` — CTk window, toolbar (Open PDF only), content placeholder
+10. `app/ui/home_frame.py` — "Open PDF" button, `filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])`
 11. `app/ui/editor_frame.py` — render page 0 on open, Prev/Next navigation, display as `CTkLabel` image
 12. `main.py`:
     ```python
@@ -610,7 +610,7 @@ Tasks — create in order:
 
 ### Sprint 2 — Signature Library (Save & Reuse)
 
-**Goal:** Draw or import TTD/Paraf, save to library, reuse from thumbnail panel.
+**Goal:** Draw or import Signature/Initials, save to library, reuse from thumbnail panel.
 
 Tasks:
 
@@ -619,8 +619,8 @@ Tasks:
 3. `app/ui/signature_picker.py` — 3-tab modal
 4. Wire ask-save dialog after draw/import
 5. Wire left panel in `main_window.py` → `SavedSignaturesPanel` (200px)
-6. Wire "Tambah TTD" → `SignaturePickerModal(sig_type="TTD")`
-7. Wire "Tambah Paraf" → `SignaturePickerModal(sig_type="PARAF")`
+6. Wire "Add Signature" → `SignaturePickerModal(sig_type="TTD")`
+7. Wire "Add Initials" → `SignaturePickerModal(sig_type="PARAF")`
 
 **Definition of Done Sprint 2:**
 - Draw → save dialog → saved PNG appears in left panel
@@ -640,12 +640,12 @@ Tasks:
 2. Update `editor_frame.py`: stack `OverlayCanvas` over page image, `add_overlay()` method
 3. Wire picker result → `add_overlay()`
 4. Wire `database.mark_used()` on apply
-5. Right-click context menu → "Hapus"
+5. Right-click context menu → "Delete"
 
 **Definition of Done Sprint 3:**
 - Overlay appears on page after selecting from library or drawing new
 - Overlay draggable and resizable
-- Multiple overlays (TTD + Paraf) coexist on same page
+- Multiple overlays (Signature + Initials) coexist on same page
 
 ---
 
@@ -656,15 +656,15 @@ Tasks:
 Tasks:
 
 1. Complete `pdf_handler.py` — `embed_overlays_and_save()`
-2. "Simpan" → `{stem}_signed.pdf` in same directory as source
-3. "Simpan Sebagai" → `filedialog.asksaveasfilename()`
-4. After save: success dialog + "Buka Folder" via `platform_utils.open_folder()`
+2. "Save" → `{stem}_signed.pdf` in same directory as source
+3. "Save As" → `filedialog.asksaveasfilename()`
+4. After save: success dialog + "Open Folder" via `platform_utils.open_folder()`
 5. Verify multi-page embed correct
 
 **Definition of Done Sprint 4:**
 - `*_signed.pdf` produced correctly
 - Overlays at correct position/scale
-- "Buka Folder" opens native file manager on Windows, macOS, and Linux
+- "Open Folder" opens native file manager on Windows, macOS, and Linux
 
 ---
 
@@ -674,7 +674,7 @@ Tasks:
 
 1. Undo/Redo via `overlay_history` stack in `editor_frame.py`
 2. Keyboard shortcuts via `platform_utils.bind_shortcuts()` (Cmd on macOS, Ctrl elsewhere)
-3. Rename saved signature: right-click thumbnail → "Ubah Nama" → `CTkInputDialog`
+3. Rename saved signature: right-click thumbnail → "Rename" → `CTkInputDialog`
 4. Error handling: corrupt PDF, import fail, save permission denied
 5. PyInstaller specs — create all three:
 

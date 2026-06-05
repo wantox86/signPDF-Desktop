@@ -10,10 +10,10 @@ def open_pdf(path: str) -> PdfDocument:
     try:
         doc = fitz.open(path)
     except Exception as e:
-        raise ValueError(f"Tidak dapat membuka PDF '{path}': {e}") from e
+        raise ValueError(f"Cannot open PDF '{path}': {e}") from e
     if doc.page_count == 0:
         doc.close()
-        raise ValueError(f"PDF '{path}' tidak memiliki halaman.")
+        raise ValueError(f"PDF '{path}' has no pages.")
     pdf = PdfDocument(
         path=path,
         page_count=doc.page_count,

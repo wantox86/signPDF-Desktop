@@ -12,3 +12,4 @@ build/dist/
 venv/
 *.db
 *.log
+app/__pycache__/

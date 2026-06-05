@@ -9,8 +9,8 @@ import time
 class SignatureRecord:
     """Persisted signature/paraf saved in SQLite."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    label: str = ""                    # e.g. "TTD Wawan" or "Paraf WA"
-    sig_type: str = "TTD"              # "TTD" or "PARAF"
+    label: str = ""                    # e.g. "Signature John" or "Initials JD"
+    sig_type: str = "TTD"              # "TTD" (Signature) or "PARAF" (Initials)
     source: str = "canvas"             # "canvas" | "file"
     image_path: str = ""               # Absolute path to PNG in APP_DATA_DIR/sigs/
     created_at: float = field(default_factory=time.time)
@@ -22,7 +22,7 @@ class SignatureRecord:
 class OverlayItem:
     """A signature/paraf overlay placed on a PDF page."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    sig_type: str = "TTD"              # "TTD" or "PARAF"
+    sig_type: str = "TTD"              # "TTD" or "PARAF" (internal code name)
     image: Optional[Image.Image] = None
     page_index: int = 0
     x: float = 100.0                   # Position on rendered page (pixels)

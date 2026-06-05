@@ -1,69 +1,69 @@
 # SignPDF Desktop
 
-Aplikasi desktop untuk membubuhkan tanda tangan (TTD) dan paraf ke dokumen PDF. Berjalan secara lokal di Windows, macOS, dan Linux — tanpa upload ke server, tanpa koneksi internet.
+Desktop application for adding digital signatures and initials to PDF documents. Runs locally on Windows, macOS, and Linux — no uploading to servers, no internet connection required.
 
 ---
 
-## Fitur
+## Features
 
-- **Buka PDF** — tampilkan dokumen halaman per halaman dengan navigasi Prev / Next
-- **Tambah TTD / Paraf** — tiga cara:
-  - Gambar langsung di kanvas
-  - Import dari file PNG / JPG (background putih dihapus otomatis)
-  - Pilih dari perpustakaan tanda tangan yang sudah tersimpan
-- **Drag & resize** — geser dan ubah ukuran overlay tanda tangan di atas halaman PDF
-- **Multi-halaman** — overlay bisa diletakkan di halaman yang berbeda dalam satu sesi
-- **Perpustakaan tanda tangan** — simpan TTD/Paraf untuk dipakai ulang di sesi berikutnya (disimpan lokal di SQLite)
-- **Undo / Redo** — batalkan atau ulangi perubahan overlay
-- **Simpan PDF** — embed semua overlay dan hasilkan `*_signed.pdf` di folder yang sama
-- **Simpan Sebagai** — pilih nama dan lokasi output sendiri
-- **Cross-platform** — satu codebase untuk Windows, macOS, dan Linux
+- **Open PDF** — display documents page by page with Prev / Next navigation
+- **Add Signature / Initials** — three ways:
+  - Draw directly on the canvas
+  - Import from PNG / JPG file (white background removed automatically)
+  - Select from saved signature library
+- **Drag & resize** — move and resize signature overlays on the PDF page
+- **Multi-page** — place overlays on different pages in a single session
+- **Signature library** — save signatures/initials for reuse in future sessions (stored locally in SQLite)
+- **Undo / Redo** — undo or redo overlay changes
+- **Save PDF** — embed all overlays and generate `*_signed.pdf` in the same folder
+- **Save As** — choose output name and location
+- **Cross-platform** — single codebase for Windows, macOS, and Linux
 
 ---
 
-## Tampilan
+## Layout
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  📂 Buka PDF  💾 Simpan  💾 Simpan Sebagai                      │
-│  ✍ Tambah TTD  ✍ Tambah Paraf  ↩ Undo  ↪ Redo                  │
+│  📂 Open PDF  💾 Save  💾 Save As                               │
+│  ✍ Add Signature  ✍ Add Initials  ↩ Undo  ↪ Redo               │
 ├──────────────────┬──────────────────────────────────────────────┤
-│  Panel Kiri      │  Area Editor                                  │
-│  ─────────────   │                                               │
-│  [ TTD ][ PARAF ]│   ┌────────────────────────────────────┐    │
+│  Left Panel      │  Editor Area                                  │
+│  ──────────────  │                                               │
+│ [Sig][Init]      │   ┌────────────────────────────────────┐    │
 │                  │   │                                      │    │
-│  [thumbnail TTD] │   │   Halaman PDF (rendered)            │    │
-│  [thumbnail TTD] │   │                                      │    │
-│  [thumbnail Par] │   │   [overlay TTD — bisa digeser]      │    │
-│  ...             │   │                                      │    │
+│ [thumbnail Sig]  │   │   PDF Page (rendered)              │    │
+│ [thumbnail Sig]  │   │                                      │    │
+│ [thumbnail Init] │   │   [signature overlay — draggable]  │    │
+│ ...              │   │                                      │    │
 │                  │   └────────────────────────────────────┘    │
-│                  │       < Prev    Halaman 1 / 5    Next >      │
+│                  │       < Prev    Page 1 / 5    Next >         │
 └──────────────────┴──────────────────────────────────────────────┘
 ```
 
 ---
 
-## Persyaratan Sistem
+## System Requirements
 
-| | Versi minimum |
+| | Minimum version |
 |---|---|
 | Python | 3.11+ |
 | OS | Windows 10/11, macOS 12+, Ubuntu 20.04+ |
 
-Atau gunakan binary yang sudah di-build (tidak perlu Python).
+Or use pre-built binary (Python not required).
 
 ---
 
-## Instalasi dari Source
+## Installation from Source
 
-### 1. Clone repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/your-username/signpdf-desktop.git
 cd signpdf-desktop
 ```
 
-### 2. Buat virtual environment (direkomendasikan)
+### 2. Create virtual environment (recommended)
 
 ```bash
 # Windows
@@ -81,15 +81,15 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Jalankan aplikasi
+### 4. Run the application
 
 ```bash
 python main.py
 ```
 
-Saat pertama kali dijalankan, aplikasi membuat folder data secara otomatis:
+On first run, the application creates a data folder automatically:
 
-| OS | Lokasi data |
+| OS | Data location |
 |---|---|
 | Windows | `%APPDATA%\SignPDF\` |
 | macOS | `~/Library/Application Support/SignPDF/` |
@@ -97,115 +97,115 @@ Saat pertama kali dijalankan, aplikasi membuat folder data secara otomatis:
 
 ---
 
-## Cara Pakai
+## Usage
 
-### Membuka PDF
+### Opening a PDF
 
-1. Klik **📂 Buka PDF** di toolbar, atau tekan `Ctrl+O` (Windows/Linux) / `Cmd+O` (macOS)
-2. Pilih file `.pdf` dari file dialog
-3. Halaman pertama PDF akan langsung ditampilkan
+1. Click **📂 Open PDF** in the toolbar, or press `Ctrl+O` (Windows/Linux) / `Cmd+O` (macOS)
+2. Select a `.pdf` file from the file dialog
+3. The first page of the PDF will be displayed
 
-Gunakan tombol **< Prev** dan **Next >** di bagian bawah untuk berpindah halaman.
-
----
-
-### Menambah Tanda Tangan (TTD) atau Paraf
-
-Klik **✍ Tambah TTD** atau **✍ Tambah Paraf** di toolbar. Modal akan terbuka dengan tiga tab:
-
-#### Tab "Tersimpan"
-
-Menampilkan perpustakaan tanda tangan yang sudah pernah disimpan, diurutkan dari yang paling sering digunakan. Klik thumbnail untuk langsung menempatkan overlay di halaman aktif.
-
-#### Tab "Gambar Baru"
-
-Gambar tanda tangan langsung di kanvas putih (600×250 px):
-
-- Tahan klik kiri sambil gerakkan mouse untuk menggambar
-- Klik **Hapus** untuk mengulang dari awal
-- Klik **Selesai** untuk menggunakan hasil gambar
-
-Setelah klik **Selesai**, aplikasi akan bertanya: *"Simpan tanda tangan ini untuk digunakan lagi?"*
-
-- **Simpan** → masukkan nama (contoh: "TTD Wawan"), tanda tangan disimpan ke perpustakaan
-- **Gunakan Sekali** → dipakai langsung tanpa disimpan
-
-#### Tab "Import File"
-
-1. Klik **📁 Pilih File...** dan pilih file `.png`, `.jpg`, atau `.jpeg`
-2. Preview gambar akan ditampilkan
-3. Untuk file JPG, background putih/near-white dihapus otomatis
-4. Klik **Gunakan Gambar Ini** → muncul dialog simpan seperti di atas
+Use the **< Prev** and **Next >** buttons at the bottom to navigate between pages.
 
 ---
 
-### Mengatur Posisi dan Ukuran Overlay
+### Adding a Signature or Initials
 
-Setelah overlay ditempatkan di halaman:
+Click **✍ Add Signature** or **✍ Add Initials** in the toolbar. A modal will open with three tabs:
 
-| Aksi | Caranya |
+#### "Saved" Tab
+
+Displays the library of previously saved signatures/initials, sorted by most recently used. Click a thumbnail to place an overlay on the current page.
+
+#### "Draw New" Tab
+
+Draw a signature directly on a white canvas (600×250 px):
+
+- Hold left click and move the mouse to draw
+- Click **Clear** to start over
+- Click **Done** to use the drawing
+
+After clicking **Done**, the application will ask: *"Save this signature for future use?"*
+
+- **Save** → enter a name (example: "Signature John"), signature is saved to library
+- **Don't Save** → use it this time without saving
+
+#### "Import File" Tab
+
+1. Click **📁 Choose File...** and select a `.png`, `.jpg`, or `.jpeg` file
+2. Image preview will be displayed
+3. For JPG files, white/near-white background is removed automatically
+4. Click **Use This Image** → save dialog appears (same as above)
+
+---
+
+### Adjusting Overlay Position and Size
+
+After placing an overlay on a page:
+
+| Action | How |
 |---|---|
-| Pindahkan | Klik overlay dan tahan, lalu geser ke posisi yang diinginkan |
-| Ubah ukuran | Klik dan seret **handle biru** di sudut kanan bawah overlay |
-| Pilih overlay | Klik satu kali pada overlay (muncul garis putus-putus biru) |
-| Batalkan pilihan | Klik area kosong di luar overlay |
-| Hapus overlay | Klik kanan pada overlay → pilih **Hapus** |
+| Move | Click and drag the overlay to the desired position |
+| Resize | Click and drag the **blue handle** at the bottom-right corner |
+| Select | Click once on the overlay (blue dashed border appears) |
+| Deselect | Click on empty area outside the overlay |
+| Delete | Right-click on overlay → select **Delete** |
 
-Overlay di panel kiri (thumbnail) dapat diklik langsung untuk menambah overlay baru ke halaman yang sedang aktif tanpa membuka modal.
+Overlays in the left panel (thumbnails) can be clicked directly to add a new overlay to the current page without opening the modal.
 
 ---
 
-### Undo dan Redo
+### Undo and Redo
 
-| Aksi | Tombol toolbar | Keyboard (Windows/Linux) | Keyboard (macOS) |
+| Action | Toolbar button | Keyboard (Windows/Linux) | Keyboard (macOS) |
 |---|---|---|---|
 | Undo | ↩ Undo | `Ctrl+Z` | `Cmd+Z` |
 | Redo | ↪ Redo | `Ctrl+Y` | `Cmd+Shift+Z` |
 
-Undo/Redo melacak setiap perubahan penambahan dan penghapusan overlay.
+Undo/Redo tracks every change to overlay additions and deletions.
 
 ---
 
-### Menyimpan PDF
+### Saving the PDF
 
-#### Simpan (`Ctrl+S` / `Cmd+S`)
+#### Save (`Ctrl+S` / `Cmd+S`)
 
-Menyimpan PDF baru dengan nama otomatis di folder yang sama dengan file asli:
+Saves the PDF with an auto-generated name in the same folder as the original:
 
 ```
-dokumen.pdf  →  dokumen_signed.pdf
+document.pdf  →  document_signed.pdf
 ```
 
-#### Simpan Sebagai
+#### Save As
 
-Membuka file dialog untuk memilih nama dan lokasi output sendiri.
+Opens a file dialog to choose the output name and location.
 
-Setelah berhasil tersimpan:
-- Muncul dialog konfirmasi dengan path output
-- Pilih **Ya** untuk membuka folder lokasi file di file manager (Windows Explorer / Finder / Nautilus)
-
----
-
-### Mengelola Perpustakaan Tanda Tangan
-
-Panel kiri menampilkan semua tanda tangan yang tersimpan.
-
-**Filter tab:**
-- **Semua** — tampilkan TTD dan Paraf
-- **TTD** — hanya tanda tangan penuh
-- **PARAF** — hanya paraf
-
-**Menghapus tanda tangan:**
-Klik tombol **×** kecil di pojok thumbnail. Tanda tangan dihapus dari database dan file gambar dihapus dari disk.
-
-**Mengubah nama tanda tangan:**
-Klik kanan pada thumbnail di panel kiri → **Ubah Nama** → masukkan nama baru.
+After successful save:
+- A confirmation dialog with the output path appears
+- Click **Yes** to open the folder in file manager (Windows Explorer / Finder / Nautilus)
 
 ---
 
-## Build Binary (Distribusi Tanpa Python)
+### Managing the Signature Library
 
-Pastikan `pyinstaller` sudah terinstall (`pip install -r requirements.txt`), lalu jalankan perintah sesuai target OS:
+The left panel displays all saved signatures and initials.
+
+**Filter tabs:**
+- **All** — show signatures and initials
+- **Signature** — signature only
+- **Initials** — initials only
+
+**Deleting a signature:**
+Click the small **×** button in the corner of a thumbnail. The signature is deleted from the database and image file is removed from disk.
+
+**Renaming a signature:**
+Right-click a thumbnail in the left panel → **Rename** → enter the new name.
+
+---
+
+## Building Binary (Distribution Without Python)
+
+Make sure `pyinstaller` is installed (`pip install -r requirements.txt`), then run the command for your target OS:
 
 ### Windows
 
@@ -213,7 +213,7 @@ Pastikan `pyinstaller` sudah terinstall (`pip install -r requirements.txt`), lal
 pyinstaller build/build_windows.spec
 ```
 
-Output: `dist/SignPDF.exe` — single file executable, tidak perlu Python.
+Output: `dist/SignPDF.exe` — single-file executable, Python not required.
 
 ### macOS
 
@@ -231,31 +231,31 @@ pyinstaller build/build_linux.spec
 
 Output: `dist/SignPDF` — ELF binary.
 
-> **Catatan:** Build harus dilakukan di OS target masing-masing. Tidak bisa cross-compile (misal build `.exe` dari macOS).
+> **Note:** Build must be done on the target OS. Cross-compilation is not supported (e.g., cannot build `.exe` from macOS).
 
 ---
 
-## Struktur Project
+## Project Structure
 
 ```
 signpdf-desktop/
 ├── main.py                     # Entry point
 ├── requirements.txt
 ├── app/
-│   ├── config.py               # Path data dir per OS, konstanta UI
-│   ├── database.py             # SQLite CRUD — perpustakaan tanda tangan
-│   ├── models.py               # Dataclass: SignatureRecord, OverlayItem, PdfDocument
-│   ├── pdf_handler.py          # Buka PDF, render halaman, embed overlay
-│   ├── platform_utils.py       # Helper per-OS (open folder, icon, shortcuts)
-│   ├── signature_handler.py    # Load gambar, hapus bg, stroke-to-image, crop
+│   ├── config.py               # Data dir path per OS, UI constants
+│   ├── database.py             # SQLite CRUD — signature library
+│   ├── models.py               # Dataclasses: SignatureRecord, OverlayItem, PdfDocument
+│   ├── pdf_handler.py          # Open PDF, render pages, embed overlays
+│   ├── platform_utils.py       # OS-specific helpers (open folder, icon, shortcuts)
+│   ├── signature_handler.py    # Load image, remove background, stroke-to-image, crop
 │   └── ui/
-│       ├── main_window.py      # Window utama, toolbar, layout
-│       ├── home_frame.py       # Layar awal (sebelum PDF dibuka)
-│       ├── editor_frame.py     # Viewer PDF + manajemen overlay + undo/redo
-│       ├── signature_picker.py # Modal 3-tab: Tersimpan / Gambar Baru / Import
-│       ├── canvas_draw.py      # Widget gambar tanda tangan
-│       ├── overlay_canvas.py   # Canvas overlay: drag, resize, context menu
-│       └── saved_signatures.py # Panel thumbnail perpustakaan tanda tangan
+│       ├── main_window.py      # Main window, toolbar, layout
+│       ├── home_frame.py       # Landing screen (before PDF is opened)
+│       ├── editor_frame.py     # PDF viewer + overlay management + undo/redo
+│       ├── signature_picker.py # Modal with 3 tabs: Saved / Draw New / Import
+│       ├── canvas_draw.py      # Signature drawing widget
+│       ├── overlay_canvas.py   # Overlay canvas: drag, resize, context menu
+│       └── saved_signatures.py # Signature library thumbnail panel
 ├── tests/
 │   ├── test_sprint1.py
 │   ├── test_sprint2.py
@@ -272,27 +272,27 @@ signpdf-desktop/
 
 ## Development
 
-### Menjalankan Test
+### Running Tests
 
 ```bash
 pytest tests/
 ```
 
-120 unit test, dikelompokkan per sprint. Test tidak membutuhkan display (tidak membuka window Tk).
+120 unit tests, grouped by sprint. Tests don't require a display (no Tk window opened).
 
-### Dependensi
+### Dependencies
 
-| Package | Versi | Kegunaan |
+| Package | Version | Purpose |
 |---|---|---|
-| `customtkinter` | 5.2.2 | UI widgets modern berbasis tkinter |
-| `pymupdf` | 1.24.3 | Render dan embed PDF |
-| `Pillow` | 10.3.0 | Manipulasi gambar |
-| `numpy` | ≥1.24.0 | Hapus background putih (array pixel) |
-| `pyinstaller` | 6.6.0 | Build binary distribusi |
+| `customtkinter` | 5.2.2 | Modern UI widgets based on tkinter |
+| `pymupdf` | 1.24.3 | Render and embed PDF |
+| `Pillow` | 10.3.0 | Image manipulation |
+| `numpy` | ≥1.24.0 | Remove white background (pixel array) |
+| `pyinstaller` | 6.6.0 | Build distribution binaries |
 | `pytest` | ≥7.0.0 | Testing |
 
 ---
 
-## Lisensi
+## License
 
-Lihat file [LICENSE](LICENSE).
+See [LICENSE](LICENSE) file.

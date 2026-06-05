@@ -11,9 +11,9 @@ class HomeFrame(ctk.CTkFrame):
 
     def _build(self):
         ctk.CTkLabel(self, text="SignPDF Desktop", font=ctk.CTkFont(size=28, weight="bold")).pack(pady=(80, 8))
-        ctk.CTkLabel(self, text="Tambahkan tanda tangan digital ke dokumen PDF Anda",
+        ctk.CTkLabel(self, text="Add digital signatures to your PDF documents",
                      text_color="gray").pack(pady=(0, 40))
-        ctk.CTkButton(self, text="📂 Buka PDF", command=self.open_cmd,
+        ctk.CTkButton(self, text="📂 Open PDF", command=self.open_cmd,
                       width=200, height=48, font=ctk.CTkFont(size=16)).pack()
-        ctk.CTkLabel(self, text="Atau gunakan Ctrl+O", text_color="gray",
+        ctk.CTkLabel(self, text="Or use Ctrl+O", text_color="gray",
                      font=ctk.CTkFont(size=12)).pack(pady=(8, 0))
