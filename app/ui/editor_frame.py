@@ -312,7 +312,7 @@ class EditorFrame(ctk.CTkFrame):
             self.mode_btn.configure(text="👁 Mode View", fg_color="#2563EB", hover_color="#1D4ED8")
             self.mode_label.configure(text="● EDIT", text_color="#E07B00")
             # Show text toolbar and text canvas
-            self._text_toolbar.pack(fill="x", before=self.page_container)
+            self._text_toolbar.pack(side="top", fill="x")
             if self._text_canvas:
                 self._text_canvas.place(x=0, y=0,
                                         width=self._rendered_page_width,
