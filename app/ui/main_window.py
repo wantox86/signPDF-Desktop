@@ -1,19 +1,24 @@
 import customtkinter as ctk
-from tkinter import filedialog, Menu, messagebox
+from tkinter import filedialog, Menu, messagebox, PhotoImage
+from pathlib import Path
 from app.config import WINDOW_TITLE, WINDOW_SIZE
 from app.platform_utils import get_app_icon_path, bind_shortcuts
+from app.ui.about_dialog import AboutDialog
+from app.version import APP_VERSION, APP_NAME
 
 
 class MainWindow(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title(WINDOW_TITLE)
+        self.title(f"{APP_NAME}  v{APP_VERSION}")
         self.geometry(WINDOW_SIZE)
 
+        # Set window icon — cross-platform via PhotoImage (PNG)
         icon_path = get_app_icon_path()
-        if icon_path:
+        if icon_path and icon_path.endswith('.png'):
             try:
-                self.iconbitmap(icon_path)
+                img = PhotoImage(file=icon_path)
+                self.iconphoto(False, img)
             except Exception:
                 pass
 
@@ -60,13 +65,7 @@ class MainWindow(ctk.CTk):
         help_menu.add_command(label="About SignPDF", command=self._show_about)
 
     def _show_about(self):
-        messagebox.showinfo(
-            "About SignPDF",
-            "SignPDF Desktop v1.0\n\n"
-            "Add digital signatures and initials to PDF documents.\n"
-            "All processing done locally, no internet required.\n\n"
-            "Built with Python, tkinter, and PyMuPDF."
-        )
+        AboutDialog(self)
 
     # ------------------------------------------------------------------
     # Toolbar
