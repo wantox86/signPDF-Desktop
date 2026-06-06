@@ -1,16 +1,23 @@
 """
 Transparent canvas overlay for text editing in Edit Mode.
 
-Interaction model (mirrors OverlayCanvas for signatures):
-  - Click extracted block   → open edit-text dialog immediately
-  - Click TextOverlay       → select (drag to move, resize handle at bottom-right)
+Interaction model:
+  - Click extracted block    → open edit-text dialog immediately
+  - Click TextOverlay        → select (drag to move, resize handle bottom-right)
   - Double-click TextOverlay → open edit-text dialog
-  - Click empty space       → open add-new-text dialog (on mouse-release, no drag)
-  - Right-click TextOverlay → context menu (Edit / Delete)
-  - Delete key              → delete selected overlay
+  - Click empty space        → open add-new-text dialog (on release, no drag)
+  - Right-click TextOverlay  → context menu (Edit / Delete)
+  - Delete key               → delete selected overlay
 
-All stored coordinates are in BASE DPI space (zoom = 1.0).
-Drawing multiplies by zoom; click events divide by zoom.
+Coordinate convention:
+  All stored coordinates (ov.x, ov.y, ov.width, ov.height and block.px_*) are
+  in BASE DPI space (zoom = 1.0). Drawing multiplies by zoom; click events divide
+  by zoom.
+
+Performance:
+  During drag/resize only the affected overlay's canvas items are updated via
+  coords() / itemconfig() — no full delete-all redraw — to avoid ghost artefacts
+  on macOS transparent canvases.
 """
 import tkinter as tk
 from tkinter import simpledialog, Menu
@@ -19,8 +26,8 @@ from app.models import TextOverlay
 from app.pdf_text_handler import ExtractedTextBlock
 from app.platform_utils import get_canvas_transparent_bg
 
-_HIT_EXPAND  = 4    # extra px (base space) around each block bbox for hit detection
-_HANDLE_SIZE = 10   # resize-handle side length in DISPLAY pixels
+_HIT_EXPAND  = 4    # px (base space) added around block bbox for easier clicking
+_HANDLE_SIZE = 10   # resize-handle side length in display pixels
 
 
 class TextOverlayCanvas(tk.Canvas):
@@ -52,7 +59,7 @@ class TextOverlayCanvas(tk.Canvas):
         self.bind("<B1-Motion>",       self._on_drag)
         self.bind("<ButtonRelease-1>", self._on_release)
         self.bind("<Double-Button-1>", self._on_double_click)
-        self.bind("<Button-2>",        self._on_right_click)   # macOS middle = right equiv
+        self.bind("<Button-2>",        self._on_right_click)
         self.bind("<Button-3>",        self._on_right_click)
         self.bind("<Delete>",          self._on_delete_key)
 
@@ -62,14 +69,14 @@ class TextOverlayCanvas(tk.Canvas):
 
     def set_zoom(self, zoom: float) -> None:
         self._zoom = zoom
-        self._redraw()
+        self._full_redraw()
 
     def load_extracted_blocks(self, blocks: list[ExtractedTextBlock],
                               page_index: int | None = None) -> None:
         if page_index is not None:
             self._page_index = page_index
         self._extracted_blocks = blocks
-        self._redraw()
+        self._full_redraw()
 
     def set_page(self, page_index: int, page_width_px: int, page_height_px: int,
                  blocks: list[ExtractedTextBlock]) -> None:
@@ -78,7 +85,7 @@ class TextOverlayCanvas(tk.Canvas):
         self._extracted_blocks = blocks
         self._text_overlays = [o for o in self._text_overlays if o.page_index == page_index]
         self._selected_id = None
-        self._redraw()
+        self._full_redraw()
 
     def get_text_overlays(self) -> list[TextOverlay]:
         return [o for o in self._text_overlays if o.page_index == self._page_index]
@@ -89,13 +96,13 @@ class TextOverlayCanvas(tk.Canvas):
     def clear_page_overlays(self, page_index: int) -> None:
         self._text_overlays = [o for o in self._text_overlays if o.page_index != page_index]
         self._selected_id = None
-        self._redraw()
+        self._full_redraw()
 
     # ------------------------------------------------------------------
-    # Drawing
+    # Full redraw  (used on zoom change, page change, selection change)
     # ------------------------------------------------------------------
 
-    def _redraw(self) -> None:
+    def _full_redraw(self) -> None:
         self.delete("all")
         z = self._zoom
 
@@ -105,53 +112,72 @@ class TextOverlayCanvas(tk.Canvas):
                 block.px_x0 * z, block.px_y0 * z,
                 block.px_x1 * z, block.px_y1 * z,
                 outline="#2563EB", dash=(4, 2), width=1,
-                tags=("existing_block",)
             )
 
-        # TextOverlay boxes
         for ov in self._text_overlays:
             if ov.page_index != self._page_index:
                 continue
-            x0, y0 = ov.x * z, ov.y * z
-            x1, y1 = (ov.x + ov.width) * z, (ov.y + ov.height) * z
+            self._draw_overlay(ov)
 
-            # Fill: solid white for edited (covers original), tinted for new
-            if ov.overlay_type == "edited":
-                fill, stipple = "white", ""
-            else:
-                fill, stipple = "#fff3cd", "gray25"
+    def _draw_overlay(self, ov: TextOverlay) -> None:
+        """Create (or recreate) all canvas items for one overlay."""
+        z = self._zoom
+        x0, y0 = ov.x * z, ov.y * z
+        x1, y1 = (ov.x + ov.width) * z, (ov.y + ov.height) * z
+        fill, stipple = ("white", "") if ov.overlay_type == "edited" else ("#fff3cd", "gray25")
 
+        self.create_rectangle(
+            x0, y0, x1, y1,
+            outline="#E07B00", fill=fill, stipple=stipple,
+            tags=("text_overlay", f"rect_{ov.id}"),
+        )
+        self.create_text(
+            x0 + 2, y0 + 2,
+            text=ov.text,
+            anchor="nw",
+            font=_tk_font(ov.font_size * z, getattr(ov, "font_flags", 0)),
+            fill=ov.color_hex,
+            width=max(10, x1 - x0 - 4),
+            tags=("text_label", f"txt_{ov.id}"),
+        )
+
+        if ov.id == self._selected_id:
             self.create_rectangle(
                 x0, y0, x1, y1,
-                outline="#E07B00", fill=fill, stipple=stipple,
-                tags=("text_overlay", ov.id)
+                outline="#2563EB", dash=(4, 4), width=2,
+                tags=("selection", f"sel_{ov.id}"),
             )
-            self.create_text(
-                x0 + 2, y0 + 2,
-                text=ov.text[:80] + ("…" if len(ov.text) > 80 else ""),
-                anchor="nw",
-                font=_tk_font(ov.font_size * z, getattr(ov, "font_flags", 0)),
-                fill=ov.color_hex,
-                width=max(10, x1 - x0 - 4),
-                tags=("text_overlay_label", ov.id)
+            self.create_rectangle(
+                x1 - _HANDLE_SIZE, y1 - _HANDLE_SIZE, x1, y1,
+                fill="#2563EB", outline="white",
+                tags=("handle", f"hdl_{ov.id}"),
             )
-
-            # Selection highlight + resize handle
-            if ov.id == self._selected_id:
-                self.create_rectangle(
-                    x0, y0, x1, y1,
-                    outline="#2563EB", dash=(4, 4), width=2,
-                    tags=("selection",)
-                )
-                hx, hy = x1 - _HANDLE_SIZE, y1 - _HANDLE_SIZE
-                self.create_rectangle(
-                    hx, hy, x1, y1,
-                    fill="#2563EB", outline="white",
-                    tags=("resize_handle",)
-                )
 
     # ------------------------------------------------------------------
-    # Hit-testing helpers  (all in BASE space unless noted)
+    # Incremental update  (used during drag/resize — no ghost artefacts)
+    # ------------------------------------------------------------------
+
+    def _update_overlay_display(self, ov: TextOverlay) -> None:
+        """Move/resize existing canvas items for one overlay without full redraw."""
+        z = self._zoom
+        x0, y0 = ov.x * z, ov.y * z
+        x1, y1 = (ov.x + ov.width) * z, (ov.y + ov.height) * z
+        wrap_w = max(10, x1 - x0 - 4)
+
+        for tag, new_coords, cfg in [
+            (f"rect_{ov.id}", (x0, y0, x1, y1), {}),
+            (f"txt_{ov.id}",  (x0 + 2, y0 + 2), {"width": wrap_w}),
+            (f"sel_{ov.id}",  (x0, y0, x1, y1), {}),
+            (f"hdl_{ov.id}",  (x1 - _HANDLE_SIZE, y1 - _HANDLE_SIZE, x1, y1), {}),
+        ]:
+            items = self.find_withtag(tag)
+            if items:
+                self.coords(items[0], *new_coords)
+                if cfg:
+                    self.itemconfig(items[0], **cfg)
+
+    # ------------------------------------------------------------------
+    # Hit-testing helpers  (base space unless noted)
     # ------------------------------------------------------------------
 
     def _to_base(self, ex: float, ey: float) -> tuple[float, float]:
@@ -166,7 +192,7 @@ class TextOverlayCanvas(tk.Canvas):
         return None
 
     def _on_handle(self, ex: float, ey: float, ov: TextOverlay) -> bool:
-        """Check resize handle in DISPLAY space (handle is always _HANDLE_SIZE px)."""
+        """Check resize handle in display space."""
         z  = self._zoom
         x1 = (ov.x + ov.width)  * z
         y1 = (ov.y + ov.height) * z
@@ -181,7 +207,7 @@ class TextOverlayCanvas(tk.Canvas):
 
     def _on_press(self, event) -> None:
         self.focus_set()
-        self._drag_occurred  = False
+        self._drag_occurred   = False
         self._empty_click_pos = None
         bx, by = self._to_base(event.x, event.y)
 
@@ -197,29 +223,32 @@ class TextOverlayCanvas(tk.Canvas):
         # 2. Hit a TextOverlay → select
         hit = self._overlay_at(bx, by)
         if hit:
+            prev = self._selected_id
             self._selected_id = hit.id
             self._resizing    = False
             self._drag_offset = (bx - hit.x, by - hit.y)
-            self._redraw()
+            if prev != hit.id:
+                self._full_redraw()   # selection changed → redraw all
             return
 
-        # 3. Hit an extracted block → immediate edit dialog
+        # 3. Hit an extracted block → immediate edit
         for block in self._extracted_blocks:
             if (block.px_x0 - _HIT_EXPAND <= bx <= block.px_x1 + _HIT_EXPAND and
                     block.px_y0 - _HIT_EXPAND <= by <= block.px_y1 + _HIT_EXPAND):
                 self._selected_id = None
-                self._redraw()
+                self._full_redraw()
                 self._open_edit_dialog_for_block(block)
                 return
 
-        # 4. Empty space — deselect; remember position for potential new-text on release
-        self._selected_id     = None
+        # 4. Empty space → deselect, remember for possible new-text on release
+        if self._selected_id is not None:
+            self._selected_id = None
+            self._full_redraw()
         self._empty_click_pos = (bx, by)
-        self._redraw()
 
     def _on_drag(self, event) -> None:
         if self._selected_id is None:
-            self._empty_click_pos = None   # moved on empty space → cancel new-text
+            self._empty_click_pos = None
             return
         self._drag_occurred = True
         bx, by = self._to_base(event.x, event.y)
@@ -232,11 +261,11 @@ class TextOverlayCanvas(tk.Canvas):
         else:
             ov.x = bx - self._drag_offset[0]
             ov.y = by - self._drag_offset[1]
-        self._redraw()
+        # Incremental update avoids ghost artefacts on transparent canvas
+        self._update_overlay_display(ov)
 
     def _on_release(self, event) -> None:
         self._resizing = False
-        # Open new-text dialog only if the user clicked empty space without dragging
         if self._selected_id is None and not self._drag_occurred and self._empty_click_pos:
             x, y = self._empty_click_pos
             self._empty_click_pos = None
@@ -254,7 +283,7 @@ class TextOverlayCanvas(tk.Canvas):
         if hit is None:
             return
         self._selected_id = hit.id
-        self._redraw()
+        self._full_redraw()
         menu = Menu(self, tearoff=0)
         menu.add_command(label="Edit Text",
                          command=lambda: self._open_edit_dialog_for_overlay(hit))
@@ -270,7 +299,7 @@ class TextOverlayCanvas(tk.Canvas):
         self._text_overlays = [o for o in self._text_overlays if o.id != oid]
         if self._selected_id == oid:
             self._selected_id = None
-        self._redraw()
+        self._full_redraw()
 
     # ------------------------------------------------------------------
     # Dialogs
@@ -307,7 +336,7 @@ class TextOverlayCanvas(tk.Canvas):
         ]
         self._text_overlays.append(ov)
         self._selected_id = ov.id
-        self._redraw()
+        self._full_redraw()
 
     def _open_edit_dialog_for_overlay(self, ov: TextOverlay) -> None:
         new_text = simpledialog.askstring(
@@ -318,7 +347,7 @@ class TextOverlayCanvas(tk.Canvas):
         if new_text is None:
             return
         ov.text = new_text
-        self._redraw()
+        self._full_redraw()
 
     def _open_new_text_dialog(self, x: float, y: float) -> None:
         new_text = simpledialog.askstring(
@@ -344,7 +373,7 @@ class TextOverlayCanvas(tk.Canvas):
         )
         self._text_overlays.append(ov)
         self._selected_id = ov.id
-        self._redraw()
+        self._full_redraw()
 
 
 # ------------------------------------------------------------------
