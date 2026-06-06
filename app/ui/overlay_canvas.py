@@ -25,6 +25,7 @@ class OverlayCanvas(ctk.CTkFrame):
         self._selected_id: str | None = None
         self._drag_offset: tuple[float, float] = (0.0, 0.0)
         self._resizing = False
+        self._text_previews: list = []
 
         self.canvas = Canvas(self, width=width, height=height,
                              bg="gray20", highlightthickness=0, cursor="arrow")
@@ -63,6 +64,11 @@ class OverlayCanvas(ctk.CTkFrame):
         self.canvas.config(width=width, height=height)
         self.configure(width=width, height=height)
 
+    def set_text_previews(self, text_overlays: list) -> None:
+        """Show text edits as non-interactive boxes (used in View Mode)."""
+        self._text_previews = list(text_overlays)
+        self._redraw()
+
     # ------------------------------------------------------------------
     # Drawing  (all coordinates in display space = base × zoom)
     # ------------------------------------------------------------------
@@ -76,6 +82,23 @@ class OverlayCanvas(ctk.CTkFrame):
 
         for ov in self._overlays:
             self._draw_overlay(ov)
+
+        # Read-only text overlay previews (View Mode)
+        for ov in self._text_previews:
+            z = self._zoom
+            fill = "#fff3cd" if ov.overlay_type == "new" else "#d1ecf1"
+            self.canvas.create_rectangle(
+                ov.x * z, ov.y * z,
+                (ov.x + ov.width) * z, (ov.y + ov.height) * z,
+                outline="#E07B00", fill=fill, stipple="gray25"
+            )
+            self.canvas.create_text(
+                (ov.x + 4) * z, (ov.y + 4) * z,
+                text=ov.text[:40] + ("…" if len(ov.text) > 40 else ""),
+                anchor="nw",
+                font=("Helvetica", max(8, int(ov.font_size * z * 0.8))),
+                fill=ov.color_hex
+            )
 
     def _draw_overlay(self, ov: OverlayItem) -> None:
         if ov.image is None:

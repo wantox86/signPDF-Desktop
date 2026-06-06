@@ -37,6 +37,7 @@ class TextOverlayCanvas(tk.Canvas):
         self._extracted_blocks: list[ExtractedTextBlock] = []
         self._text_overlays: list[TextOverlay] = []
         self._selected_id: str | None = None
+        self._zoom: float = 1.0
 
         self.bind("<ButtonPress-1>", self._on_click)
 
@@ -44,8 +45,13 @@ class TextOverlayCanvas(tk.Canvas):
     # Public API
     # ------------------------------------------------------------------
 
+    def set_zoom(self, zoom: float) -> None:
+        """Update zoom level and redraw. All stored coords are in base (RENDER_DPI) space."""
+        self._zoom = zoom
+        self._redraw()
+
     def load_extracted_blocks(self, blocks: list[ExtractedTextBlock]) -> None:
-        """Load text blocks extracted from the current PDF page."""
+        """Load text blocks extracted from the current PDF page (base pixel coords)."""
         self._extracted_blocks = blocks
         self._redraw()
 
@@ -81,38 +87,44 @@ class TextOverlayCanvas(tk.Canvas):
 
     def _redraw(self) -> None:
         self.delete("all")
+        z = self._zoom
 
-        # Draw existing text block highlights (blue dashed outline)
+        # Draw existing text block highlights — coords stored in base DPI space
         for block in self._extracted_blocks:
             self.create_rectangle(
-                block.px_x0, block.px_y0, block.px_x1, block.px_y1,
+                block.px_x0 * z, block.px_y0 * z,
+                block.px_x1 * z, block.px_y1 * z,
                 outline="#2563EB", dash=(4, 2), width=1,
                 tags=("existing_block", block.text[:20])
             )
 
-        # Draw TextOverlay previews (orange filled + text label)
+        # Draw TextOverlay previews — coords stored in base DPI space
         for ov in self._text_overlays:
             if ov.page_index != self._page_index:
                 continue
             fill_color = "#fff3cd" if ov.overlay_type == "new" else "#d1ecf1"
             self.create_rectangle(
-                ov.x, ov.y, ov.x + ov.width, ov.y + ov.height,
+                ov.x * z, ov.y * z,
+                (ov.x + ov.width) * z, (ov.y + ov.height) * z,
                 outline="#E07B00", fill=fill_color, stipple="gray25",
                 tags=("text_overlay", ov.id)
             )
             self.create_text(
-                ov.x + 4, ov.y + 4,
+                (ov.x + 4) * z, (ov.y + 4) * z,
                 text=ov.text[:40] + ("…" if len(ov.text) > 40 else ""),
                 anchor="nw",
-                font=("Helvetica", max(8, int(ov.font_size * 0.8))),
+                font=("Helvetica", max(8, int(ov.font_size * z * 0.8))),
                 fill=ov.color_hex,
                 tags=("text_overlay_label", ov.id)
             )
 
     def _on_click(self, event) -> None:
-        x, y = event.x, event.y
+        # Convert display coords → base DPI coords for all hit-testing
+        z = self._zoom
+        x = event.x / z
+        y = event.y / z
 
-        # Check if click hits an existing TextOverlay (edit it)
+        # Check if click hits an existing TextOverlay (stored in base coords)
         for ov in reversed(self._text_overlays):
             if ov.page_index != self._page_index:
                 continue
@@ -120,13 +132,13 @@ class TextOverlayCanvas(tk.Canvas):
                 self._open_edit_dialog_for_overlay(ov)
                 return
 
-        # Check if click hits an existing extracted text block (edit original)
+        # Check if click hits an existing extracted text block (base coords)
         for block in self._extracted_blocks:
             if block.px_x0 <= x <= block.px_x1 and block.px_y0 <= y <= block.px_y1:
                 self._open_edit_dialog_for_block(block, x, y)
                 return
 
-        # Click on empty space — add new text block
+        # Click on empty space — store in base coords
         self._open_new_text_dialog(x, y)
 
     def _open_edit_dialog_for_block(self, block: ExtractedTextBlock, click_x: float, click_y: float) -> None:

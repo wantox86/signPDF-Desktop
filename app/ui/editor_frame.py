@@ -159,6 +159,11 @@ class EditorFrame(ctk.CTkFrame):
             self._overlay_canvas.set_page_image(self._tk_image)
             page_overlays = [o for o in self._overlays if o.page_index == self.current_page]
             self._overlay_canvas.set_overlays(page_overlays)
+        if self._text_canvas:
+            self._text_canvas.config(width=dw, height=dh)
+            self._text_canvas.set_zoom(self._zoom)
+            if self._state.mode == EditMode.EDIT:
+                self._text_canvas.place(x=0, y=0, width=dw, height=dh)
 
     # ------------------------------------------------------------------
     # Page render / navigation
@@ -190,11 +195,14 @@ class EditorFrame(ctk.CTkFrame):
             self._overlay_canvas.set_zoom(self._zoom)
             self._overlay_canvas.resize(dw, dh)
 
-        # Create text canvas if not exists (hidden by default)
+        # Create or resize text canvas
         if self._text_canvas is None:
             self._text_canvas = TextOverlayCanvas(
                 self.page_container, page_width_px=dw, page_height_px=dh
             )
+        else:
+            self._text_canvas.config(width=dw, height=dh)
+        self._text_canvas.set_zoom(self._zoom)
 
         self._overlay_canvas.set_page_image(self._tk_image)
         page_overlays = [o for o in self._overlays if o.page_index == self.current_page]
@@ -202,7 +210,15 @@ class EditorFrame(ctk.CTkFrame):
 
         self._state.current_page_index = self.current_page
         if self._state.mode == EditMode.EDIT:
+            self._text_canvas.place(x=0, y=0, width=dw, height=dh)
             self._load_text_blocks_for_page(self.current_page)
+        else:
+            # Refresh text previews on page change in View Mode
+            if self._text_canvas:
+                all_text = self._text_canvas.get_all_text_overlays()
+                self._overlay_canvas.set_text_previews(
+                    [o for o in all_text if o.page_index == self.current_page]
+                )
 
         self.lbl_page.configure(
             text=f"Page {self.current_page + 1} / {self.pdf_document.page_count}"
@@ -308,30 +324,36 @@ class EditorFrame(ctk.CTkFrame):
     # ------------------------------------------------------------------
     def _toggle_mode(self) -> None:
         if self._state.mode == EditMode.VIEW:
+            # → switching to EDIT
             self._state.mode = EditMode.EDIT
             self.mode_btn.configure(text="👁 Mode View", fg_color="#2563EB", hover_color="#1D4ED8")
             self.mode_label.configure(text="● EDIT", text_color="#E07B00")
-            # Show text toolbar and text canvas
             self._text_toolbar.pack(side="top", fill="x")
             if self._text_canvas:
+                self._text_canvas.set_zoom(self._zoom)
                 self._text_canvas.place(x=0, y=0,
                                         width=self._rendered_page_width,
                                         height=self._rendered_page_height)
-            # Disable signature buttons
+            # Clear text previews from overlay canvas (text canvas handles it now)
+            if self._overlay_canvas:
+                self._overlay_canvas.set_text_previews([])
             if self.main_window:
                 self.main_window.btn_add_ttd.configure(state="disabled")
                 self.main_window.btn_add_paraf.configure(state="disabled")
-            # Load text blocks for current page
             self._load_text_blocks_for_page(self.current_page)
         else:
+            # → switching to VIEW
             self._state.mode = EditMode.VIEW
             self.mode_btn.configure(text="⚙ Mode Edit", fg_color="#E07B00", hover_color="#B85C00")
             self.mode_label.configure(text="● VIEW", text_color="#2563EB")
-            # Hide text toolbar and text canvas
             self._text_toolbar.pack_forget()
             if self._text_canvas:
                 self._text_canvas.place_forget()
-            # Re-enable signature buttons
+                # Pass text edits to overlay canvas for read-only preview
+                all_text = self._text_canvas.get_all_text_overlays()
+                page_text = [o for o in all_text if o.page_index == self.current_page]
+                if self._overlay_canvas:
+                    self._overlay_canvas.set_text_previews(page_text)
             if self.main_window:
                 self.main_window.btn_add_ttd.configure(state="normal")
                 self.main_window.btn_add_paraf.configure(state="normal")
