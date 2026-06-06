@@ -198,7 +198,12 @@ class EditorFrame(ctk.CTkFrame):
         # Create or resize text canvas
         if self._text_canvas is None:
             self._text_canvas = TextOverlayCanvas(
-                self.page_container, page_width_px=dw, page_height_px=dh
+                self.page_container, page_width_px=dw, page_height_px=dh,
+                font_provider=lambda: (
+                    self._text_toolbar.font_name,
+                    self._text_toolbar.font_size,
+                    self._text_toolbar.color_hex,
+                )
             )
         else:
             self._text_canvas.config(width=dw, height=dh)
@@ -365,7 +370,7 @@ class EditorFrame(ctk.CTkFrame):
         def _extract():
             try:
                 blocks = extract_text_blocks(self.pdf_document.path, page_index)
-                self.after(0, lambda: self._text_canvas.load_extracted_blocks(blocks))
+                self.after(0, lambda: self._text_canvas.load_extracted_blocks(blocks, page_index))
             except Exception:
                 pass
         threading.Thread(target=_extract, daemon=True).start()

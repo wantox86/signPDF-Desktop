@@ -86,18 +86,27 @@ class OverlayCanvas(ctk.CTkFrame):
         # Read-only text overlay previews (View Mode)
         for ov in self._text_previews:
             z = self._zoom
-            fill = "#fff3cd" if ov.overlay_type == "new" else "#d1ecf1"
-            self.canvas.create_rectangle(
-                ov.x * z, ov.y * z,
-                (ov.x + ov.width) * z, (ov.y + ov.height) * z,
-                outline="#E07B00", fill=fill, stipple="gray25"
-            )
+            x0, y0 = ov.x * z, ov.y * z
+            x1, y1 = (ov.x + ov.width) * z, (ov.y + ov.height) * z
+            if ov.overlay_type == "edited":
+                # Cover original PDF text with white, then render new text
+                self.canvas.create_rectangle(
+                    x0, y0, x1, y1,
+                    outline="#E07B00", fill="white", stipple=""
+                )
+            else:
+                # New text block: semi-transparent yellow tint
+                self.canvas.create_rectangle(
+                    x0, y0, x1, y1,
+                    outline="#E07B00", fill="#fff3cd", stipple="gray25"
+                )
             self.canvas.create_text(
-                (ov.x + 4) * z, (ov.y + 4) * z,
-                text=ov.text[:40] + ("…" if len(ov.text) > 40 else ""),
+                x0 + 2, y0 + 2,
+                text=ov.text[:60] + ("…" if len(ov.text) > 60 else ""),
                 anchor="nw",
-                font=("Helvetica", max(8, int(ov.font_size * z * 0.8))),
-                fill=ov.color_hex
+                font=("Helvetica", max(7, int(ov.font_size * z))),
+                fill=ov.color_hex,
+                width=max(10, x1 - x0 - 4)
             )
 
     def _draw_overlay(self, ov: OverlayItem) -> None:

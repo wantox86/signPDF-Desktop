@@ -1,28 +1,26 @@
 """
 Tkinter Canvas widget that renders on top of the PDF page image in Edit Mode.
-
-Responsibilities:
-- Display clickable highlight rectangles over all existing text blocks
-- Allow user to click a highlight to open an inline edit dialog
-- Allow user to place a new text block by clicking empty space
-- Render new/edited TextOverlay items as live previews
-- Expose get_text_overlays() -> list[TextOverlay]
 """
 import tkinter as tk
 from tkinter import simpledialog
-import customtkinter as ctk
+from typing import Callable
 from app.models import TextOverlay
 from app.pdf_text_handler import ExtractedTextBlock
 from app.platform_utils import get_canvas_transparent_bg
+
+# Extra pixels (in base-DPI space) added around each block bbox for easier clicking
+_HIT_EXPAND = 4
 
 
 class TextOverlayCanvas(tk.Canvas):
     """
     Transparent canvas overlay for text editing in Edit Mode.
-    Stacked on top of the PDF page image at identical position and size.
+    All stored coordinates are in base DPI space (zoom = 1.0).
+    Drawing multiplies by zoom; click events divide by zoom.
     """
 
-    def __init__(self, parent, page_width_px: int, page_height_px: int, **kwargs):
+    def __init__(self, parent, page_width_px: int, page_height_px: int,
+                 font_provider: Callable | None = None, **kwargs):
         super().__init__(
             parent,
             width=page_width_px,
@@ -36,8 +34,9 @@ class TextOverlayCanvas(tk.Canvas):
         self._page_index = 0
         self._extracted_blocks: list[ExtractedTextBlock] = []
         self._text_overlays: list[TextOverlay] = []
-        self._selected_id: str | None = None
         self._zoom: float = 1.0
+        # Callback: () -> (font_name, font_size, color_hex) for new text blocks
+        self._font_provider = font_provider
 
         self.bind("<ButtonPress-1>", self._on_click)
 
@@ -46,18 +45,19 @@ class TextOverlayCanvas(tk.Canvas):
     # ------------------------------------------------------------------
 
     def set_zoom(self, zoom: float) -> None:
-        """Update zoom level and redraw. All stored coords are in base (RENDER_DPI) space."""
         self._zoom = zoom
         self._redraw()
 
-    def load_extracted_blocks(self, blocks: list[ExtractedTextBlock]) -> None:
-        """Load text blocks extracted from the current PDF page (base pixel coords)."""
+    def load_extracted_blocks(self, blocks: list[ExtractedTextBlock],
+                              page_index: int | None = None) -> None:
+        """Load blocks for the current page. Pass page_index to keep _page_index in sync."""
+        if page_index is not None:
+            self._page_index = page_index
         self._extracted_blocks = blocks
         self._redraw()
 
     def set_page(self, page_index: int, page_width_px: int, page_height_px: int,
                  blocks: list[ExtractedTextBlock]) -> None:
-        """Switch to a new page: update dimensions and reload blocks."""
         self._page_index = page_index
         self._page_w = page_width_px
         self._page_h = page_height_px
@@ -68,15 +68,12 @@ class TextOverlayCanvas(tk.Canvas):
         self._redraw()
 
     def get_text_overlays(self) -> list[TextOverlay]:
-        """Return all TextOverlay items (new + edited) for current page."""
         return [ov for ov in self._text_overlays if ov.page_index == self._page_index]
 
     def get_all_text_overlays(self) -> list[TextOverlay]:
-        """Return overlays for all pages (for embed step)."""
         return list(self._text_overlays)
 
     def clear_page_overlays(self, page_index: int) -> None:
-        """Remove all overlays on a specific page."""
         self._text_overlays = [o for o in self._text_overlays
                                 if o.page_index != page_index]
         self._redraw()
@@ -89,42 +86,46 @@ class TextOverlayCanvas(tk.Canvas):
         self.delete("all")
         z = self._zoom
 
-        # Draw existing text block highlights — coords stored in base DPI space
+        # Blue dashed outline around each extracted block
         for block in self._extracted_blocks:
             self.create_rectangle(
                 block.px_x0 * z, block.px_y0 * z,
                 block.px_x1 * z, block.px_y1 * z,
                 outline="#2563EB", dash=(4, 2), width=1,
-                tags=("existing_block", block.text[:20])
+                tags=("existing_block",)
             )
 
-        # Draw TextOverlay previews — coords stored in base DPI space
+        # Overlays: "edited" = solid white covers original text; "new" = yellow tinted
         for ov in self._text_overlays:
             if ov.page_index != self._page_index:
                 continue
-            fill_color = "#fff3cd" if ov.overlay_type == "new" else "#d1ecf1"
+            if ov.overlay_type == "edited":
+                fill_color, stipple = "white", ""
+            else:
+                fill_color, stipple = "#fff3cd", "gray25"
+            x0, y0 = ov.x * z, ov.y * z
+            x1, y1 = (ov.x + ov.width) * z, (ov.y + ov.height) * z
             self.create_rectangle(
-                ov.x * z, ov.y * z,
-                (ov.x + ov.width) * z, (ov.y + ov.height) * z,
-                outline="#E07B00", fill=fill_color, stipple="gray25",
+                x0, y0, x1, y1,
+                outline="#E07B00", fill=fill_color, stipple=stipple,
                 tags=("text_overlay", ov.id)
             )
             self.create_text(
-                (ov.x + 4) * z, (ov.y + 4) * z,
-                text=ov.text[:40] + ("…" if len(ov.text) > 40 else ""),
+                x0 + 2, y0 + 2,
+                text=ov.text[:60] + ("…" if len(ov.text) > 60 else ""),
                 anchor="nw",
-                font=("Helvetica", max(8, int(ov.font_size * z * 0.8))),
+                font=("Helvetica", max(7, int(ov.font_size * z))),
                 fill=ov.color_hex,
+                width=max(10, x1 - x0 - 4),
                 tags=("text_overlay_label", ov.id)
             )
 
     def _on_click(self, event) -> None:
-        # Convert display coords → base DPI coords for all hit-testing
         z = self._zoom
         x = event.x / z
         y = event.y / z
 
-        # Check if click hits an existing TextOverlay (stored in base coords)
+        # Re-edit an existing TextOverlay
         for ov in reversed(self._text_overlays):
             if ov.page_index != self._page_index:
                 continue
@@ -132,20 +133,20 @@ class TextOverlayCanvas(tk.Canvas):
                 self._open_edit_dialog_for_overlay(ov)
                 return
 
-        # Check if click hits an existing extracted text block (base coords)
+        # Hit an extracted text block — expand bbox by _HIT_EXPAND px for easier clicking
         for block in self._extracted_blocks:
-            if block.px_x0 <= x <= block.px_x1 and block.px_y0 <= y <= block.px_y1:
-                self._open_edit_dialog_for_block(block, x, y)
+            if (block.px_x0 - _HIT_EXPAND <= x <= block.px_x1 + _HIT_EXPAND and
+                    block.px_y0 - _HIT_EXPAND <= y <= block.px_y1 + _HIT_EXPAND):
+                self._open_edit_dialog_for_block(block)
                 return
 
-        # Click on empty space — store in base coords
+        # Empty space — add new text
         self._open_new_text_dialog(x, y)
 
-    def _open_edit_dialog_for_block(self, block: ExtractedTextBlock, click_x: float, click_y: float) -> None:
-        """Open a simple input dialog pre-filled with the block's existing text."""
+    def _open_edit_dialog_for_block(self, block: ExtractedTextBlock) -> None:
         new_text = simpledialog.askstring(
-            "Edit Teks",
-            f"Edit teks:",
+            "Edit Text",
+            "Edit text:",
             initialvalue=block.text,
             parent=self.winfo_toplevel()
         )
@@ -156,16 +157,16 @@ class TextOverlayCanvas(tk.Canvas):
             page_index=block.page_index,
             x=block.px_x0,
             y=block.px_y0,
-            width=block.px_x1 - block.px_x0,
-            height=block.px_y1 - block.px_y0,
+            width=max(block.px_x1 - block.px_x0, 20.0),
+            height=max(block.px_y1 - block.px_y0, 10.0),
             text=new_text,
-            font_name=_safe_tk_font(block.font_name),
+            font_name=_safe_font(block.font_name),
             font_size=block.font_size,
             color_hex=block.color_hex,
             original_bbox=(block.pdf_x0, block.pdf_y0, block.pdf_x1, block.pdf_y1),
             original_text=block.text,
         )
-        # Remove any prior edit of same block
+        # Replace any prior edit of the same block
         self._text_overlays = [
             o for o in self._text_overlays
             if not (o.overlay_type == "edited" and
@@ -176,10 +177,9 @@ class TextOverlayCanvas(tk.Canvas):
         self._redraw()
 
     def _open_edit_dialog_for_overlay(self, ov: TextOverlay) -> None:
-        """Re-edit an existing TextOverlay that was already added."""
         new_text = simpledialog.askstring(
-            "Edit Teks",
-            "Edit teks:",
+            "Edit Text",
+            "Edit text:",
             initialvalue=ov.text,
             parent=self.winfo_toplevel()
         )
@@ -189,28 +189,35 @@ class TextOverlayCanvas(tk.Canvas):
         self._redraw()
 
     def _open_new_text_dialog(self, x: float, y: float) -> None:
-        """Open dialog to enter new text at clicked position."""
         new_text = simpledialog.askstring(
-            "Tambah Teks",
-            "Masukkan teks baru:",
+            "Add Text",
+            "Enter new text:",
             parent=self.winfo_toplevel()
         )
         if not new_text:
             return
+        # Use toolbar-provided font settings if available
+        if self._font_provider:
+            font_name, font_size, color_hex = self._font_provider()
+        else:
+            font_name, font_size, color_hex = "helv", 12.0, "#000000"
         ov = TextOverlay(
             overlay_type="new",
             page_index=self._page_index,
             x=x, y=y,
-            width=300.0, height=30.0,
+            width=300.0, height=font_size * (150 / 72) * 1.4,
             text=new_text,
-            font_name="helv",
-            font_size=12.0,
-            color_hex="#000000",
+            font_name=font_name,
+            font_size=font_size,
+            color_hex=color_hex,
         )
         self._text_overlays.append(ov)
         self._redraw()
 
 
-def _safe_tk_font(font_name: str) -> str:
-    """Normalize font name for storage; actual rendering uses helv fallback."""
-    return font_name if font_name else "helv"
+def _safe_font(font_name: str) -> str:
+    """Map pymupdf font names to pymupdf built-ins for embed; fall back to helv."""
+    BUILTIN = {"helv", "tiro", "zadb", "symb", "cour", "times"}
+    # Strip subset prefix like "ABCDEF+" from embedded font names
+    clean = font_name.split("+")[-1] if "+" in font_name else font_name
+    return clean if clean.lower() in {b.lower() for b in BUILTIN} else "helv"
