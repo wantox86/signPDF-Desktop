@@ -62,6 +62,7 @@ class TextOverlay:
     text: str = ""                     # Text content to insert
     font_name: str = "helv"            # pymupdf built-in font name
     font_size: float = 12.0            # In points
+    font_flags: int = 0                # pymupdf flags: bit1=italic, bit4=bold, bit3=mono, bit2=serif
     color_hex: str = "#000000"         # Text color as hex string
     original_bbox: tuple = field(default_factory=tuple)  # (x0,y0,x1,y1) in PDF points — for edited blocks
     original_text: str = ""            # Original text before edit — for reference

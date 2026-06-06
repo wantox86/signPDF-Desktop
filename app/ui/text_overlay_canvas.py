@@ -114,7 +114,7 @@ class TextOverlayCanvas(tk.Canvas):
                 x0 + 2, y0 + 2,
                 text=ov.text[:60] + ("…" if len(ov.text) > 60 else ""),
                 anchor="nw",
-                font=("Helvetica", max(7, int(ov.font_size * z))),
+                font=_tk_font(ov.font_size * z, getattr(ov, "font_flags", 0)),
                 fill=ov.color_hex,
                 width=max(10, x1 - x0 - 4),
                 tags=("text_overlay_label", ov.id)
@@ -160,8 +160,9 @@ class TextOverlayCanvas(tk.Canvas):
             width=max(block.px_x1 - block.px_x0, 20.0),
             height=max(block.px_y1 - block.px_y0, 10.0),
             text=new_text,
-            font_name=_safe_font(block.font_name),
+            font_name=block.font_name,
             font_size=block.font_size,
+            font_flags=block.font_flags,
             color_hex=block.color_hex,
             original_bbox=(block.pdf_x0, block.pdf_y0, block.pdf_x1, block.pdf_y1),
             original_text=block.text,
@@ -215,9 +216,15 @@ class TextOverlayCanvas(tk.Canvas):
         self._redraw()
 
 
-def _safe_font(font_name: str) -> str:
-    """Map pymupdf font names to pymupdf built-ins for embed; fall back to helv."""
-    BUILTIN = {"helv", "tiro", "zadb", "symb", "cour", "times"}
-    # Strip subset prefix like "ABCDEF+" from embedded font names
-    clean = font_name.split("+")[-1] if "+" in font_name else font_name
-    return clean if clean.lower() in {b.lower() for b in BUILTIN} else "helv"
+def _tk_font(size_pts: float, flags: int = 0) -> tuple:
+    """Build a tkinter font tuple from a point size and pymupdf span flags."""
+    bold   = bool(flags & 16)
+    italic = bool(flags & 2)
+    mono   = bool(flags & 8)
+    family = "Courier" if mono else "Helvetica"
+    styles = []
+    if bold:
+        styles.append("bold")
+    if italic:
+        styles.append("italic")
+    return (family, max(7, int(size_pts))) + (tuple(styles) if styles else ())

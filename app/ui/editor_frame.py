@@ -33,6 +33,7 @@ class EditorFrame(ctk.CTkFrame):
         self._text_toolbar = None
         self._rendered_page_width = 0
         self._rendered_page_height = 0
+        self._original_base_image = None   # saved base image before text-edit preview
 
         self._build()
         self._render_current_page()
@@ -339,9 +340,13 @@ class EditorFrame(ctk.CTkFrame):
                 self._text_canvas.place(x=0, y=0,
                                         width=self._rendered_page_width,
                                         height=self._rendered_page_height)
-            # Clear text previews from overlay canvas (text canvas handles it now)
             if self._overlay_canvas:
                 self._overlay_canvas.set_text_previews([])
+            # Restore original base image if we showed a text-edit preview
+            if self._original_base_image is not None:
+                self._base_image = self._original_base_image
+                self._original_base_image = None
+                self._apply_zoom()   # re-render display image from original
             if self.main_window:
                 self.main_window.btn_add_ttd.configure(state="disabled")
                 self.main_window.btn_add_paraf.configure(state="disabled")
@@ -354,14 +359,57 @@ class EditorFrame(ctk.CTkFrame):
             self._text_toolbar.pack_forget()
             if self._text_canvas:
                 self._text_canvas.place_forget()
-                # Pass text edits to overlay canvas for read-only preview
                 all_text = self._text_canvas.get_all_text_overlays()
-                page_text = [o for o in all_text if o.page_index == self.current_page]
-                if self._overlay_canvas:
-                    self._overlay_canvas.set_text_previews(page_text)
+                if all_text:
+                    # Re-render page with text edits applied for accurate preview
+                    self._render_view_with_text_edits(all_text)
+                else:
+                    if self._overlay_canvas:
+                        self._overlay_canvas.set_text_previews([])
             if self.main_window:
                 self.main_window.btn_add_ttd.configure(state="normal")
                 self.main_window.btn_add_paraf.configure(state="normal")
+
+    def _render_view_with_text_edits(self, text_overlays: list) -> None:
+        """Re-render the current page with text edits baked in for View Mode preview."""
+        import threading, tempfile, os
+        from app.pdf_text_handler import embed_text_overlays as _embed
+        from app.pdf_handler import render_page as _render
+
+        source_path = self.pdf_document.path
+        page_idx    = self.current_page
+        zoom        = self._zoom
+
+        def _run():
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+                    tmp = f.name
+                _embed(source_path, tmp, text_overlays)
+                img = _render(tmp, page_idx)
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+                bw, bh = img.size
+                dw = max(1, int(bw * zoom))
+                dh = max(1, int(bh * zoom))
+                display = img.resize((dw, dh), Image.LANCZOS) if zoom != 1.0 else img
+                tk_img = ImageTk.PhotoImage(display)
+                self.after(0, lambda: self._apply_view_preview(img, tk_img))
+            except Exception:
+                pass
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _apply_view_preview(self, base_img, tk_img) -> None:
+        """Apply the re-rendered page image (with text edits) to the display."""
+        if self._original_base_image is None:
+            self._original_base_image = self._base_image
+        self._base_image = base_img
+        self._tk_image   = tk_img
+        if self._overlay_canvas:
+            self._overlay_canvas.set_text_previews([])   # not needed; image has the edits
+            self._overlay_canvas.set_page_image(tk_img)
 
     def _load_text_blocks_for_page(self, page_index: int) -> None:
         if not self.pdf_document or not self._text_canvas:
@@ -409,19 +457,26 @@ class EditorFrame(ctk.CTkFrame):
         text_overlays = self._text_canvas.get_all_text_overlays() if self._text_canvas else []
 
         def _run():
+            import os
+            tmp_path = output_path + ".tmp.pdf"
             try:
-                # Step 1: embed signatures to temp file
-                tmp_path = output_path + ".tmp.pdf"
+                # Step 1: embed signatures → temp
                 embed_overlays_and_save(self.pdf_document.path, tmp_path, sig_overlays)
-                # Step 2: embed text on top of temp file → final output
+                # Step 2: embed text edits on top → final output
                 if text_overlays:
                     embed_text_overlays(tmp_path, output_path, text_overlays)
+                    try:
+                        os.unlink(tmp_path)   # remove temp file
+                    except OSError:
+                        pass
                 else:
-                    # No text overlays — just rename temp to output
-                    import os
                     os.rename(tmp_path, output_path)
                 self.after(0, lambda: self._on_save_success(output_path))
             except Exception as e:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
                 self.after(0, lambda: messagebox.showerror("Failed to Save", str(e)))
 
         threading.Thread(target=_run, daemon=True).start()

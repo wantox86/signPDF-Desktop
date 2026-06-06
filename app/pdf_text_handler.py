@@ -26,6 +26,8 @@ class ExtractedTextBlock:
     px_y0: float
     px_x1: float
     px_y1: float
+    # pymupdf span flags: bit1=italic, bit2=serifed, bit3=monospaced, bit4=bold
+    font_flags: int = 0
 
 
 def _color_int_to_hex(color_int: int) -> str:
@@ -100,6 +102,7 @@ def extract_text_blocks(pdf_path: str, page_index: int) -> list[ExtractedTextBlo
                     pdf_x1=bbox[2], pdf_y1=bbox[3],
                     px_x0=bbox[0] * scale_x, px_y0=bbox[1] * scale_y,
                     px_x1=bbox[2] * scale_x, px_y1=bbox[3] * scale_y,
+                    font_flags=span.get("flags", 0),
                 ))
     return results
 
@@ -137,18 +140,17 @@ def embed_text_overlays(source_path: str, output_path: str, text_overlays: list)
 
         for ov in overlays:
             rgb = _hex_to_rgb_float(ov.color_hex)
+            fontname = _safe_font(ov.font_name, getattr(ov, "font_flags", 0))
 
             if ov.overlay_type == "edited" and ov.original_bbox:
-                # Cover original text with white rectangle
                 ob = ov.original_bbox   # (x0,y0,x1,y1) in PDF points
-                white_rect = fitz.Rect(ob[0], ob[1], ob[2], ob[3])
-                page.draw_rect(white_rect, color=(1,1,1), fill=(1,1,1), overlay=True)
-
-                # Insert replacement text at original bbox
+                # Cover original text with white rectangle
+                page.draw_rect(fitz.Rect(*ob), color=(1, 1, 1), fill=(1, 1, 1), overlay=True)
+                # Insert replacement text — give extra height so it doesn't clip
                 insert_rect = fitz.Rect(ob[0], ob[1], ob[2], ob[3] + ov.font_size * 2)
                 page.insert_textbox(
                     insert_rect, ov.text,
-                    fontname=_safe_font(ov.font_name),
+                    fontname=fontname,
                     fontsize=ov.font_size,
                     color=rgb,
                     overlay=True,
@@ -158,12 +160,11 @@ def embed_text_overlays(source_path: str, output_path: str, text_overlays: list)
                 # New text block — convert pixel coords to PDF points
                 pdf_x0 = ov.x * scale_x
                 pdf_y0 = ov.y * scale_y
-                pdf_x1 = (ov.x + ov.width)  * scale_x
+                pdf_x1 = (ov.x + ov.width) * scale_x
                 pdf_y1 = (ov.y + ov.height + ov.font_size * 4) * scale_y
-                insert_rect = fitz.Rect(pdf_x0, pdf_y0, pdf_x1, pdf_y1)
                 page.insert_textbox(
-                    insert_rect, ov.text,
-                    fontname=_safe_font(ov.font_name),
+                    fitz.Rect(pdf_x0, pdf_y0, pdf_x1, pdf_y1), ov.text,
+                    fontname=fontname,
                     fontsize=ov.font_size,
                     color=rgb,
                     overlay=True,
@@ -173,12 +174,39 @@ def embed_text_overlays(source_path: str, output_path: str, text_overlays: list)
     doc.close()
 
 
-def _safe_font(font_name: str) -> str:
+def _safe_font(font_name: str, font_flags: int = 0) -> str:
     """
-    Map font name to a pymupdf built-in font to avoid missing-font errors.
-    pymupdf built-ins: helv, tiro, zadb, symb, cour, times, ZapfDingbats.
-    If font_name is not a known built-in, fall back to 'helv'.
+    Map a font name + pymupdf flags to the best matching pymupdf built-in.
+    Flags: bit1=italic (2), bit2=serifed (4), bit3=monospaced (8), bit4=bold (16).
+    pymupdf built-ins with style variants:
+      helv/hebo/heit/hebi  — Helvetica family
+      tiro/tibd/tiit/tibi  — Times family
+      cour/cobo/coit/cobi  — Courier family
     """
-    BUILTIN = {"helv", "tiro", "zadb", "symb", "cour", "times", "ZapfDingbats",
-               "Helvetica", "Times-Roman", "Courier"}
-    return font_name if font_name in BUILTIN else "helv"
+    bold   = bool(font_flags & 16)
+    italic = bool(font_flags & 2)
+    serif  = bool(font_flags & 4)
+    mono   = bool(font_flags & 8)
+
+    # Try to detect family from the embedded font name
+    name_lower = font_name.lower().split("+")[-1]  # strip subset prefix
+    if any(k in name_lower for k in ("courier", "cour", "mono", "consolas", "menlo")):
+        mono = True
+    elif any(k in name_lower for k in ("times", "georgia", "serif", "palatino")):
+        serif = True
+    if "bold" in name_lower:
+        bold = True
+    if "italic" in name_lower or "oblique" in name_lower:
+        italic = True
+
+    if mono:
+        table = {(False, False): "cour", (True, False): "cobo",
+                 (False, True): "coit", (True, True): "cobi"}
+    elif serif:
+        table = {(False, False): "tiro", (True, False): "tibd",
+                 (False, True): "tiit", (True, True): "tibi"}
+    else:
+        table = {(False, False): "helv", (True, False): "hebo",
+                 (False, True): "heit", (True, True): "hebi"}
+
+    return table[(bold, italic)]
