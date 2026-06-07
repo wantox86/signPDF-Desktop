@@ -32,18 +32,18 @@ Desktop application for adding digital signatures and initials to PDF documents.
 │  File  Edit  Help                                               │
 ├─────────────────────────────────────────────────────────────────┤
 │  📁 Open PDF  💾 Save  💾 Save As                               │
-│  ✎ Add Signature  ✎ Add Initials  ⟲ Undo  ↻ Redo               │
+│  ✎ Add Signature  ✎ Add Initials  ⟲ Undo  ↻ Redo                │
 ├──────────────────┬──────────────────────────────────────────────┤
-│  Left Panel      │  Editor Area                                  │
-│  ──────────────  │                                               │
-│ [Sig][Init]      │   ┌────────────────────────────────────┐    │
-│                  │   │      [SignPDF Icon]                │    │
-│ [thumbnail Sig]  │   │   PDF Page (75% zoom)              │    │
-│ [thumbnail Sig]  │   │   (scroll with mouse wheel)         │    │
-│ [thumbnail Init] │   │                                      │    │
-│ ...              │   │   [signature overlay — draggable]  │    │
-│                  │   │   (delete with Del key or menu)    │    │
-│                  │   └────────────────────────────────────┘    │
+│  Left Panel      │  Editor Area                                 │
+│  ──────────────  │                                              │
+│ [Sig][Init]      │   ┌────────────────────────────────────┐     │
+│                  │   │      [SignPDF Icon]                │     │
+│ [thumbnail Sig]  │   │   PDF Page (75% zoom)              │     │
+│ [thumbnail Sig]  │   │   (scroll with mouse wheel)        │     │
+│ [thumbnail Init] │   │                                    │     │
+│ ...              │   │   [signature overlay — draggable]  │     │
+│                  │   │   (delete with Del key or menu)    │     │
+│                  │   └────────────────────────────────────┘     │
 │                  │       < Prev    Page 1 / 5    Next >         │
 │                  │       Zoom: −  75%  +                        │
 └──────────────────┴──────────────────────────────────────────────┘
