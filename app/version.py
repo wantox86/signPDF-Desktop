@@ -1,0 +1,3 @@
+APP_VERSION   = "0.2.0"
+APP_NAME      = "SignPDF Desktop"
+APP_BUILD_DATE = "2026-06-06"

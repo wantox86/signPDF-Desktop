@@ -1,8 +1,11 @@
 import customtkinter as ctk
 from tkinter import Frame, Canvas, ttk
 from PIL import Image, ImageTk
-from app.models import PdfDocument, OverlayItem
+from app.models import PdfDocument, OverlayItem, EditMode, EditorState, TextOverlay
 from app.pdf_handler import render_page
+from app.pdf_text_handler import extract_text_blocks, embed_text_overlays
+from app.ui.text_overlay_canvas import TextOverlayCanvas
+from app.ui.text_edit_toolbar import TextEditToolbar
 from app.config import DEFAULT_OVERLAY_WIDTH, DEFAULT_OVERLAY_HEIGHT
 
 ZOOM_STEP = 0.25
@@ -25,6 +28,12 @@ class EditorFrame(ctk.CTkFrame):
         self._history:    list[list[OverlayItem]] = []
         self._redo_stack: list[list[OverlayItem]] = []
         self._overlay_canvas = None
+        self._state = EditorState(mode=EditMode.VIEW, current_page_index=0)
+        self._text_canvas = None
+        self._text_toolbar = None
+        self._rendered_page_width = 0
+        self._rendered_page_height = 0
+        self._original_base_image = None   # saved base image before text-edit preview
 
         self._build()
         self._render_current_page()
@@ -85,6 +94,33 @@ class EditorFrame(ctk.CTkFrame):
             side="right", padx=(4, 0), pady=4)
         ctk.CTkLabel(nav, text="Zoom:", text_color="gray").pack(side="right", padx=(8, 2), pady=4)
 
+        # Mode toggle and indicator (center)
+        self.mode_btn = ctk.CTkButton(
+            nav,
+            text="⚙ Mode Edit",
+            width=130,
+            fg_color="#E07B00",
+            hover_color="#B85C00",
+            command=self._toggle_mode
+        )
+        self.mode_btn.pack(side="left", padx=12, pady=4)
+
+        self.mode_label = ctk.CTkLabel(
+            nav,
+            text="● VIEW",
+            text_color="#2563EB",
+            font=ctk.CTkFont(size=11, weight="bold")
+        )
+        self.mode_label.pack(side="left", padx=4)
+
+        # Text edit toolbar (hidden by default)
+        self._text_toolbar = TextEditToolbar(
+            self,
+            on_clear_page_callback=self._clear_text_overlays_on_page,
+            fg_color="transparent"
+        )
+        # Do NOT pack yet — only shown in Edit Mode
+
     def _update_scrollregion(self, event=None):
         self._scroll_canvas.configure(scrollregion=self._scroll_canvas.bbox("all"))
 
@@ -124,6 +160,11 @@ class EditorFrame(ctk.CTkFrame):
             self._overlay_canvas.set_page_image(self._tk_image)
             page_overlays = [o for o in self._overlays if o.page_index == self.current_page]
             self._overlay_canvas.set_overlays(page_overlays)
+        if self._text_canvas:
+            self._text_canvas.config(width=dw, height=dh)
+            self._text_canvas.set_zoom(self._zoom)
+            if self._state.mode == EditMode.EDIT:
+                self._text_canvas.place(x=0, y=0, width=dw, height=dh)
 
     # ------------------------------------------------------------------
     # Page render / navigation
@@ -136,6 +177,8 @@ class EditorFrame(ctk.CTkFrame):
         display = self._base_image if self._zoom == 1.0 else \
                   self._base_image.resize((dw, dh), Image.LANCZOS)
         self._tk_image = ImageTk.PhotoImage(display)
+        self._rendered_page_width = dw
+        self._rendered_page_height = dh
 
         self.page_container.config(width=dw, height=dh)
 
@@ -153,9 +196,35 @@ class EditorFrame(ctk.CTkFrame):
             self._overlay_canvas.set_zoom(self._zoom)
             self._overlay_canvas.resize(dw, dh)
 
+        # Create or resize text canvas
+        if self._text_canvas is None:
+            self._text_canvas = TextOverlayCanvas(
+                self.page_container, page_width_px=dw, page_height_px=dh,
+                font_provider=lambda: (
+                    self._text_toolbar.font_name,
+                    self._text_toolbar.font_size,
+                    self._text_toolbar.color_hex,
+                )
+            )
+        else:
+            self._text_canvas.config(width=dw, height=dh)
+        self._text_canvas.set_zoom(self._zoom)
+
         self._overlay_canvas.set_page_image(self._tk_image)
         page_overlays = [o for o in self._overlays if o.page_index == self.current_page]
         self._overlay_canvas.set_overlays(page_overlays)
+
+        self._state.current_page_index = self.current_page
+        if self._state.mode == EditMode.EDIT:
+            self._text_canvas.place(x=0, y=0, width=dw, height=dh)
+            self._load_text_blocks_for_page(self.current_page)
+        else:
+            # Refresh text previews on page change in View Mode
+            if self._text_canvas:
+                all_text = self._text_canvas.get_all_text_overlays()
+                self._overlay_canvas.set_text_previews(
+                    [o for o in all_text if o.page_index == self.current_page]
+                )
 
         self.lbl_page.configure(
             text=f"Page {self.current_page + 1} / {self.pdf_document.page_count}"
@@ -257,6 +326,108 @@ class EditorFrame(ctk.CTkFrame):
         return list(self._overlays)
 
     # ------------------------------------------------------------------
+    # Mode Switching
+    # ------------------------------------------------------------------
+    def _toggle_mode(self) -> None:
+        if self._state.mode == EditMode.VIEW:
+            # → switching to EDIT
+            self._state.mode = EditMode.EDIT
+            self.mode_btn.configure(text="👁 Mode View", fg_color="#2563EB", hover_color="#1D4ED8")
+            self.mode_label.configure(text="● EDIT", text_color="#E07B00")
+            self._text_toolbar.pack(side="top", fill="x")
+            if self._text_canvas:
+                self._text_canvas.set_zoom(self._zoom)
+                self._text_canvas.place(x=0, y=0,
+                                        width=self._rendered_page_width,
+                                        height=self._rendered_page_height)
+            if self._overlay_canvas:
+                self._overlay_canvas.set_text_previews([])
+            # Restore original base image if we showed a text-edit preview
+            if self._original_base_image is not None:
+                self._base_image = self._original_base_image
+                self._original_base_image = None
+                self._apply_zoom()   # re-render display image from original
+            if self.main_window:
+                self.main_window.btn_add_ttd.configure(state="disabled")
+                self.main_window.btn_add_paraf.configure(state="disabled")
+            self._load_text_blocks_for_page(self.current_page)
+        else:
+            # → switching to VIEW
+            self._state.mode = EditMode.VIEW
+            self.mode_btn.configure(text="⚙ Mode Edit", fg_color="#E07B00", hover_color="#B85C00")
+            self.mode_label.configure(text="● VIEW", text_color="#2563EB")
+            self._text_toolbar.pack_forget()
+            if self._text_canvas:
+                self._text_canvas.place_forget()
+                all_text = self._text_canvas.get_all_text_overlays()
+                if all_text:
+                    # Re-render page with text edits applied for accurate preview
+                    self._render_view_with_text_edits(all_text)
+                else:
+                    if self._overlay_canvas:
+                        self._overlay_canvas.set_text_previews([])
+            if self.main_window:
+                self.main_window.btn_add_ttd.configure(state="normal")
+                self.main_window.btn_add_paraf.configure(state="normal")
+
+    def _render_view_with_text_edits(self, text_overlays: list) -> None:
+        """Re-render the current page with text edits baked in for View Mode preview."""
+        import threading, tempfile, os
+        from app.pdf_text_handler import embed_text_overlays as _embed
+        from app.pdf_handler import render_page as _render
+
+        source_path = self.pdf_document.path
+        page_idx    = self.current_page
+        zoom        = self._zoom
+
+        def _run():
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+                    tmp = f.name
+                _embed(source_path, tmp, text_overlays)
+                img = _render(tmp, page_idx)
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+                bw, bh = img.size
+                dw = max(1, int(bw * zoom))
+                dh = max(1, int(bh * zoom))
+                display = img.resize((dw, dh), Image.LANCZOS) if zoom != 1.0 else img
+                tk_img = ImageTk.PhotoImage(display)
+                self.after(0, lambda: self._apply_view_preview(img, tk_img))
+            except Exception:
+                pass
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _apply_view_preview(self, base_img, tk_img) -> None:
+        """Apply the re-rendered page image (with text edits) to the display."""
+        if self._original_base_image is None:
+            self._original_base_image = self._base_image
+        self._base_image = base_img
+        self._tk_image   = tk_img
+        if self._overlay_canvas:
+            self._overlay_canvas.set_text_previews([])   # not needed; image has the edits
+            self._overlay_canvas.set_page_image(tk_img)
+
+    def _load_text_blocks_for_page(self, page_index: int) -> None:
+        if not self.pdf_document or not self._text_canvas:
+            return
+        import threading
+        def _extract():
+            try:
+                blocks = extract_text_blocks(self.pdf_document.path, page_index)
+                self.after(0, lambda: self._text_canvas.load_extracted_blocks(blocks, page_index))
+            except Exception:
+                pass
+        threading.Thread(target=_extract, daemon=True).start()
+
+    def _clear_text_overlays_on_page(self) -> None:
+        if self._text_canvas:
+            self._text_canvas.clear_page_overlays(self._state.current_page_index)
+
+    # ------------------------------------------------------------------
     # Save
     # ------------------------------------------------------------------
     def save(self):
@@ -277,19 +448,38 @@ class EditorFrame(ctk.CTkFrame):
         if path:
             self._do_save(path)
 
-    def _do_save(self, output_path: str):
+    def _do_save(self, output_path: str) -> None:
         import threading
         from tkinter import messagebox
         from app.pdf_handler import embed_overlays_and_save
 
-        def worker():
+        sig_overlays = self._overlay_canvas.get_overlays()
+        text_overlays = self._text_canvas.get_all_text_overlays() if self._text_canvas else []
+
+        def _run():
+            import os
+            tmp_path = output_path + ".tmp.pdf"
             try:
-                embed_overlays_and_save(self.pdf_document.path, output_path, self._overlays)
+                # Step 1: embed signatures → temp
+                embed_overlays_and_save(self.pdf_document.path, tmp_path, sig_overlays)
+                # Step 2: embed text edits on top → final output
+                if text_overlays:
+                    embed_text_overlays(tmp_path, output_path, text_overlays)
+                    try:
+                        os.unlink(tmp_path)   # remove temp file
+                    except OSError:
+                        pass
+                else:
+                    os.rename(tmp_path, output_path)
                 self.after(0, lambda: self._on_save_success(output_path))
             except Exception as e:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
                 self.after(0, lambda: messagebox.showerror("Failed to Save", str(e)))
 
-        threading.Thread(target=worker, daemon=True).start()
+        threading.Thread(target=_run, daemon=True).start()
 
     def _on_save_success(self, output_path: str):
         from tkinter import messagebox
