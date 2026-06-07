@@ -25,6 +25,7 @@ class OverlayCanvas(ctk.CTkFrame):
         self._selected_id: str | None = None
         self._drag_offset: tuple[float, float] = (0.0, 0.0)
         self._resizing = False
+        self._text_previews: list = []
 
         self.canvas = Canvas(self, width=width, height=height,
                              bg="gray20", highlightthickness=0, cursor="arrow")
@@ -63,6 +64,11 @@ class OverlayCanvas(ctk.CTkFrame):
         self.canvas.config(width=width, height=height)
         self.configure(width=width, height=height)
 
+    def set_text_previews(self, text_overlays: list) -> None:
+        """Show text edits as non-interactive boxes (used in View Mode)."""
+        self._text_previews = list(text_overlays)
+        self._redraw()
+
     # ------------------------------------------------------------------
     # Drawing  (all coordinates in display space = base × zoom)
     # ------------------------------------------------------------------
@@ -76,6 +82,32 @@ class OverlayCanvas(ctk.CTkFrame):
 
         for ov in self._overlays:
             self._draw_overlay(ov)
+
+        # Read-only text overlay previews (View Mode)
+        for ov in self._text_previews:
+            z = self._zoom
+            x0, y0 = ov.x * z, ov.y * z
+            x1, y1 = (ov.x + ov.width) * z, (ov.y + ov.height) * z
+            if ov.overlay_type == "edited":
+                # Cover original PDF text with white, then render new text
+                self.canvas.create_rectangle(
+                    x0, y0, x1, y1,
+                    outline="#E07B00", fill="white", stipple=""
+                )
+            else:
+                # New text block: semi-transparent yellow tint
+                self.canvas.create_rectangle(
+                    x0, y0, x1, y1,
+                    outline="#E07B00", fill="#fff3cd", stipple="gray25"
+                )
+            self.canvas.create_text(
+                x0 + 2, y0 + 2,
+                text=ov.text[:60] + ("…" if len(ov.text) > 60 else ""),
+                anchor="nw",
+                font=("Helvetica", max(7, int(ov.font_size * z))),
+                fill=ov.color_hex,
+                width=max(10, x1 - x0 - 4)
+            )
 
     def _draw_overlay(self, ov: OverlayItem) -> None:
         if ov.image is None:

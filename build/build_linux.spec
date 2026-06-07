@@ -8,7 +8,7 @@ a = Analysis(
     ['../main.py'],
     pathex=['..'],
     binaries=[],
-    datas=[('../assets', 'assets')],
+    datas=[('../assets', 'assets'), ('../docs', 'docs')],
     hiddenimports=['customtkinter', 'PIL', 'fitz', 'numpy', 'sqlite3'],
     hookspath=[],
     hooksconfig={},
