@@ -89,8 +89,8 @@ Silent no-op if `sig_id` not found.
 | | Detail |
 |---|---|
 | Returns | `PdfDocument(path, page_count, file_name)` |
-| Raises | `ValueError("Tidak dapat membuka PDF '...'")` if file is unreadable or corrupt |
-| Raises | `ValueError("PDF '...' tidak memiliki halaman.")` if `page_count == 0` |
+| Raises | `ValueError("Cannot open PDF '...': ...")` if file is unreadable or corrupt |
+| Raises | `ValueError("PDF '...' has no pages.")` if `page_count == 0` |
 | Note | Opens and closes fitz document internally — no handle kept open |
 
 ---
@@ -241,7 +241,7 @@ OverlayCanvas(parent, width: int, height: int, on_change: Callable | None = None
 | `<ButtonPress-1>` on overlay | Select overlay; detect if on resize handle |
 | `<B1-Motion>` | Drag selected overlay; or resize if handle was clicked |
 | `<ButtonRelease-1>` | End drag/resize; fire `on_change()` |
-| `<Button-3>` on overlay | Show context menu → Hapus |
+| `<Button-3>` on overlay | Show context menu → Delete |
 
 ### Resize Constraints
 
@@ -259,7 +259,7 @@ OverlayCanvas(parent, width: int, height: int, on_change: Callable | None = None
 CanvasDrawWidget(parent, on_done: Callable[[Image.Image], None] | None = None)
 ```
 
-`on_done(pil_image)` is called when user clicks **Selesai** with a non-empty canvas.
+`on_done(pil_image)` is called when user clicks **✓ Done** with a non-empty canvas.
 
 ### Public Methods
 
@@ -298,7 +298,7 @@ Loads from DB immediately on construction.
 - Grid: 3 columns
 - Label: truncated at 12 characters
 - Delete button: `×` at top-right corner (red)
-- Right-click menu: Gunakan / Ubah Nama / Hapus
+- Right-click menu: Use / Rename / Delete
 
 ---
 
@@ -323,21 +323,21 @@ Read after `wait_window(modal)` returns.
 | Value | Meaning |
 |---|---|
 | `None` | User cancelled (closed modal without selecting) |
-| `(image, record)` | `record` is `None` if user chose "Gunakan Sekali" |
-| `(image, record)` | `record` is a saved `SignatureRecord` if user chose "Simpan" |
+| `(image, record)` | `record` is `None` if user answered "No" to the save prompt (use once) |
+| `(image, record)` | `record` is a saved `SignatureRecord` if user answered "Yes" and provided a label |
 
 ### Tabs
 
 | Tab | Source | Ask-save dialog shown? |
 |---|---|---|
-| Tersimpan | Existing `SignatureRecord` from DB | No — already saved |
-| Gambar Baru | `CanvasDrawWidget` → `canvas_strokes_to_image` + `crop_to_content` | Yes |
+| Saved | Existing `SignatureRecord` from DB | No — already saved |
+| Draw New | `CanvasDrawWidget` → `canvas_strokes_to_image` + `crop_to_content` | Yes |
 | Import File | `filedialog` → `load_image_transparent` + `crop_to_content` | Yes |
 
 ### Ask-Save Dialog Flow
 
 ```
-messagebox.askyesno("Simpan Tanda Tangan?", ...)
+messagebox.askyesno("Save Signature?", "Save this signature for future use?")
   → YES: CTkInputDialog for label → database.save_signature() → record set
   → NO:  record = None
   → Cancel label dialog: modal stays open (no result set)

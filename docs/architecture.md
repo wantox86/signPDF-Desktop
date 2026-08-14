@@ -31,8 +31,8 @@
             │
    ┌────────▼────────────────────┐
    │    signature_picker.py      │
-   │  Tab 1: Tersimpan           │◄── SavedSignaturesPanel
-   │  Tab 2: Gambar Baru         │◄── canvas_draw.py
+   │  Tab 1: Saved                │◄── SavedSignaturesPanel
+   │  Tab 2: Draw New             │◄── canvas_draw.py
    │  Tab 3: Import File         │◄── filedialog + signature_handler
    └────────┬────────────────────┘
             │ result: (PIL.Image, SignatureRecord | None)
@@ -109,7 +109,7 @@ main.py
 ## Save Flow (threaded)
 
 ```
-User clicks Simpan
+User clicks Save
   → editor_frame.save()
   → _do_save(output_path)
   → threading.Thread(target=worker).start()
@@ -117,6 +117,6 @@ User clicks Simpan
          embed_overlays_and_save(source, output, overlays)  ← fitz PDF write
          self.after(0, lambda: _on_save_success(output_path))
   → _on_save_success()
-       messagebox.askyesno("Berhasil Disimpan", ...)
+       messagebox.askyesno("Saved Successfully", ...)
        platform_utils.open_folder(output_path)  ← native file manager
 ```

@@ -1,6 +1,37 @@
 # CLAUDE.md — SignPDF Desktop
 
-Desktop app: draw/import/place digital signatures and initials onto PDFs. Python 3.11+, tkinter + customtkinter, pymupdf, Pillow. All 5 sprints complete, 120 unit tests. UI language: English. Features: menu bar, 75% default zoom, aspect-ratio maintained thumbnails, Delete key overlay removal.
+Desktop app: draw/import/place digital signatures and initials onto PDFs. Python 3.11+, tkinter + customtkinter, pymupdf, Pillow. All 5 sprints complete, 120 unit tests. UI language: English (see caveat below). Features: menu bar, 75% default zoom, aspect-ratio maintained thumbnails, Delete key overlay removal.
+
+**⚠ UI language caveat:** the Edit Mode feature (`app/ui/text_edit_toolbar.py`, and some strings in `app/ui/editor_frame.py`) currently has **Indonesian UI text** ("Warna:", "Hapus Teks Halaman Ini", "Pilih warna teks", "Mode Edit"/"Mode View" toggle labels) — this contradicts the "UI language: English" claim above and hasn't been fixed as of this writing. `docs/PLAN-EditMode.md` accurately documents these Indonesian strings (matches the code); the rest of the app (signature picker, saved-signatures panel, save flow, etc.) is genuinely English throughout. If you're asked to make the UI fully English, this is the place to look.
+
+---
+
+## Relation to the other SignPDF repos
+
+This is one of **three independent repos** for the same product family — not a shared codebase,
+no shared code, three different languages/stacks:
+
+| Repo | Platform | Stack | Cloud sync status |
+|---|---|---|---|
+| `signPdf` (`~/Documents/Github/signPdf`) | Android | Kotlin | Implemented (`feature/cloud-signature-sync` branch, not yet merged) |
+| `signPDF-Backend` (`~/Documents/Github/signPDF-Backend`) | Backend API | Go + MySQL | N/A — it *is* the backend |
+| `signPDF-Desktop` (this repo) | Windows/macOS/Linux | Python + tkinter | **Not implemented** — still 100% local/offline |
+
+**This app currently has no network layer at all** — everything is local SQLite + filesystem
+(see `database.py`, `APP_DATA_DIR`). It does not talk to `signPDF-Backend`.
+
+`signPDF-Backend` was explicitly designed from the start to eventually serve this Desktop app too
+(and a future iOS client) — see that repo's own `CLAUDE.md` and `signPdf/CLAUDE.md`'s "Cloud
+Signature Sync" section (decision #8) for the full design: Guest-vs-Authenticated mode, a manual
+Sync button, the backend's custom `Authorization: Basic <opaque-token>` auth scheme, and the
+client-side (not server-side) sync algorithm. None of that has been built here yet. If/when
+Desktop cloud sync is implemented:
+- The API surface to integrate against is documented in `signPDF-Backend/CLAUDE.md` — same
+  endpoints the Android client uses (`/api/auth/login`, `/api/signatures` CRUD, etc.).
+- The *concept* (Guest vs Authenticated, manual Sync, client owns conflict resolution) is worth
+  mirroring for consistency across platforms, but the actual implementation here would need to be
+  Desktop-appropriate (e.g. a settings dialog or menu item instead of a mobile status bar) — don't
+  try to literally port Kotlin/Android code.
 
 ---
 
