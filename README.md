@@ -271,6 +271,43 @@ Output: `dist/SignPDF` — ELF binary.
 
 ---
 
+## Publishing a Release
+
+There's no CI for this repo (can't cross-compile, so nothing to automate the way `signPdf`'s
+Android build is) — publishing is manual, per platform, from whichever machine you built on.
+
+A draft release already exists to upload into: **`v1.0.0`**
+(https://github.com/wantox86/signPDF-Desktop/releases/tag/v1.0.0 once published — while still a
+draft, GitHub shows it under an `untagged-...` URL instead; find it via `gh release list` or the
+repo's Releases tab if the direct link 404s).
+
+```bash
+# Windows (dist/SignPDF.exe)
+gh release upload v1.0.0 dist/SignPDF.exe
+
+# macOS -- .app is a folder, zip it first
+cd dist && zip -r SignPDF-macOS.zip SignPDF.app && cd ..
+gh release upload v1.0.0 dist/SignPDF-macOS.zip
+
+# Linux (dist/SignPDF)
+gh release upload v1.0.0 dist/SignPDF
+```
+
+No `gh` CLI on the build machine? Drag-and-drop the same files onto the release's edit page in
+the browser instead (Releases tab → the `v1.0.0` draft → Edit).
+
+Once all three platforms are uploaded, publish it:
+
+```bash
+gh release edit v1.0.0 --draft=false
+```
+
+`signPDF-web`'s Download section links to `releases/latest/download/<filename>` once this is
+live, so keep filenames stable across future releases (or update the links in `signPDF-web` if
+you rename them).
+
+---
+
 ## Project Structure
 
 ```
