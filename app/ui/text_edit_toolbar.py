@@ -33,7 +33,7 @@ class TextEditToolbar(ctk.CTkFrame):
         self.size_var = ctk.StringVar(value=str(self.DEFAULT_SIZE))
         ctk.CTkEntry(self, textvariable=self.size_var, width=50).pack(side="left", padx=2)
 
-        ctk.CTkLabel(self, text="Warna:").pack(side="left", padx=(8, 2))
+        ctk.CTkLabel(self, text="Color:").pack(side="left", padx=(8, 2))
         self.color_btn = ctk.CTkButton(
             self, text="  ■  ", width=50,
             fg_color=self.DEFAULT_COLOR,
@@ -42,13 +42,13 @@ class TextEditToolbar(ctk.CTkFrame):
         self.color_btn.pack(side="left", padx=2)
 
         ctk.CTkButton(
-            self, text="Hapus Teks Halaman Ini",
+            self, text="Clear Page Text",
             fg_color="#DC2626", hover_color="#991B1B",
             command=self._on_clear, width=160
         ).pack(side="right", padx=8)
 
     def _pick_color(self) -> None:
-        result = colorchooser.askcolor(color=self._color, title="Pilih warna teks")
+        result = colorchooser.askcolor(color=self._color, title="Choose text color")
         if result and result[1]:
             self._color = result[1]
             self.color_btn.configure(fg_color=self._color)

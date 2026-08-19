@@ -97,7 +97,7 @@ class EditorFrame(ctk.CTkFrame):
         # Mode toggle and indicator (center)
         self.mode_btn = ctk.CTkButton(
             nav,
-            text="⚙ Mode Edit",
+            text="⚙ Edit Mode",
             width=130,
             fg_color="#E07B00",
             hover_color="#B85C00",
@@ -332,7 +332,7 @@ class EditorFrame(ctk.CTkFrame):
         if self._state.mode == EditMode.VIEW:
             # → switching to EDIT
             self._state.mode = EditMode.EDIT
-            self.mode_btn.configure(text="👁 Mode View", fg_color="#2563EB", hover_color="#1D4ED8")
+            self.mode_btn.configure(text="👁 View Mode", fg_color="#2563EB", hover_color="#1D4ED8")
             self.mode_label.configure(text="● EDIT", text_color="#E07B00")
             self._text_toolbar.pack(side="top", fill="x")
             if self._text_canvas:
@@ -354,7 +354,7 @@ class EditorFrame(ctk.CTkFrame):
         else:
             # → switching to VIEW
             self._state.mode = EditMode.VIEW
-            self.mode_btn.configure(text="⚙ Mode Edit", fg_color="#E07B00", hover_color="#B85C00")
+            self.mode_btn.configure(text="⚙ Edit Mode", fg_color="#E07B00", hover_color="#B85C00")
             self.mode_label.configure(text="● VIEW", text_color="#2563EB")
             self._text_toolbar.pack_forget()
             if self._text_canvas:

@@ -1,8 +1,8 @@
 # CLAUDE.md — SignPDF Desktop
 
-Desktop app: draw/import/place digital signatures and initials onto PDFs. Python 3.11+, tkinter + customtkinter, pymupdf, Pillow. All 5 sprints complete, 120 unit tests. UI language: English (see caveat below). Features: menu bar, 75% default zoom, aspect-ratio maintained thumbnails, Delete key overlay removal.
+Desktop app: draw/import/place digital signatures and initials onto PDFs. Python 3.11+, tkinter + customtkinter, pymupdf, Pillow. All 5 sprints complete, 120 unit tests. UI language: English throughout, including Edit Mode. Features: menu bar, 75% default zoom, aspect-ratio maintained thumbnails, Delete key overlay removal.
 
-**⚠ UI language caveat:** the Edit Mode feature (`app/ui/text_edit_toolbar.py`, and some strings in `app/ui/editor_frame.py`) currently has **Indonesian UI text** ("Warna:", "Hapus Teks Halaman Ini", "Pilih warna teks", "Mode Edit"/"Mode View" toggle labels) — this contradicts the "UI language: English" claim above and hasn't been fixed as of this writing. `docs/PLAN-EditMode.md` accurately documents these Indonesian strings (matches the code); the rest of the app (signature picker, saved-signatures panel, save flow, etc.) is genuinely English throughout. If you're asked to make the UI fully English, this is the place to look.
+**UI language note:** the Edit Mode feature (`app/ui/text_edit_toolbar.py`, `app/ui/editor_frame.py`) originally shipped with Indonesian UI text ("Warna:", "Hapus Teks Halaman Ini", "Pilih warna teks", "Mode Edit"/"Mode View" toggle labels), left over from an earlier pass that missed this one feature. Fixed to English ("Color:", "Clear Page Text", "Choose text color", "Edit Mode"/"View Mode"). `docs/PLAN-EditMode.md` still shows the old Indonesian strings in its code snippets — that's a historical planning doc (frozen record of what was built at the time), not a living reference, so it wasn't updated to match; don't treat it as describing current behavior for these specific strings.
 
 ---
 
